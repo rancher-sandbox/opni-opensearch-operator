@@ -1,0 +1,20 @@
+# permissions for end users to view opensearchdashboards.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: opensearchdashboard-viewer-role
+rules:
+- apiGroups:
+  - opensearch.opni.io.my.domain
+  resources:
+  - opensearchdashboards
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - opensearch.opni.io.my.domain
+  resources:
+  - opensearchdashboards/status
+  verbs:
+  - get

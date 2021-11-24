@@ -1,0 +1,5 @@
+## Append samples you want in your CSV to this file as resources ##
+resources:
+- opensearch.opni.io_v1beta1_opensearchcluster.yaml
+- opensearch.opni.io_v1beta1_opensearchdashboard.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples
