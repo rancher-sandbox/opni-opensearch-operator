@@ -17,25 +17,71 @@ limitations under the License.
 package v1beta1
 
 import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+type ImageSpec struct {
+	Image            *string                       `json:"image,omitempty"`
+	ImagePullPolicy  *corev1.PullPolicy            `json:"imagePullPolicy,omitempty"`
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
+}
 
 // OpensearchClusterSpec defines the desired state of OpensearchCluster
 type OpensearchClusterSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Version     string     `json:"version"`
+	DefaultRepo *string    `json:"defaultRepo,omitempty"`
+	Image       *ImageSpec `json:"image,omitempty"`
+	// Secret containing an item "logging.yml" with the contents of the
+	// elasticsearch logging config.
+	ConfigSecret *corev1.LocalObjectReference `json:"configSecret,omitempty"`
+	// Reference to a secret containing the desired admin password
+	AdminPasswordFrom  *corev1.SecretKeySelector `json:"adminPasswordFrom,omitempty"`
+	Master             OpensearchWorkloadOptions `json:"master,omitempty"`
+	Data               OpensearchWorkloadOptions `json:"data,omitempty"`
+	Client             OpensearchWorkloadOptions `json:"client,omitempty"`
+	GlobalNodeSelector map[string]string         `json:"globalNodeSelector,omitempty"`
+	GlobalTolerations  []corev1.Toleration       `json:"globalTolerations,omitempty"`
+}
 
-	// Foo is an example field of OpensearchCluster. Edit opensearchcluster_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+type OpensearchWorkloadOptions struct {
+	Replicas     *int32                       `json:"replicas,omitempty"`
+	Resources    *corev1.ResourceRequirements `json:"resources,omitempty"`
+	Affinity     *corev1.Affinity             `json:"affinity,omitempty"`
+	NodeSelector map[string]string            `json:"nodeSelector,omitempty"`
+	Tolerations  []corev1.Toleration          `json:"tolerations,omitempty"`
+	Persistence  *PersistenceSpec             `json:"persistence,omitempty"`
+}
+
+type PersistenceSpec struct {
+	Enabled          bool                                `json:"enabled,omitempty"`
+	StorageClassName *string                             `json:"storageClass,omitempty"`
+	AccessModes      []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
+	// Storage size request. Defaults to 10Gi.
+	Request resource.Quantity `json:"request,omitempty"`
+}
+
+type ClusterState string
+
+const (
+	OpensearchClusterStateError   ClusterState = "Error"
+	OpensearchClusterStateWorking ClusterState = "Working"
+	OpensearchClusterStateReady   ClusterState = "Ready"
+)
+
+type AuthStatus struct {
+	GenerateOpensearchHash     *bool                     `json:"generateOpensearchHash"`
+	OpensearchAuthSecretKeyRef *corev1.SecretKeySelector `json:"elasticsearchAuthSecretKeyRef,omitempty"`
 }
 
 // OpensearchClusterStatus defines the observed state of OpensearchCluster
 type OpensearchClusterStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Conditions  []string     `json:"conditions,omitempty"`
+	State       ClusterState `json:"opensearchState,omitempty"`
+	Version     *string      `json:"version,omitempty"`
+	Initialized bool         `json:"initialized,omitempty"`
+	Auth        AuthStatus   `json:"auth,omitempty"`
 }
 
 //+kubebuilder:object:root=true

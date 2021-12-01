@@ -1,0 +1,14 @@
+#!/bin/bash
+
+cd $(dirname $0)
+
+./generate
+./vet
+
+source version
+
+echo "Version is ${VERSION}"
+
+cd ..
+
+CGO_ENABLED=0 go build -ldflags "-w -s -X main.Version=$VERSION" -o bin/manager .

@@ -1,4 +1,4 @@
-domain: my.domain
+domain: opni.io
 layout:
 - go.kubebuilder.io/v3
 plugins:
@@ -11,8 +11,8 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: my.domain
-  group: opensearch.opni.io
+  domain: opni.io
+  group: opensearch
   kind: OpensearchCluster
   path: github.com/rancher/opni-opensearch-operator/api/v1beta1
   version: v1beta1
@@ -20,8 +20,8 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: my.domain
-  group: opensearch.opni.io
+  domain: opni.io
+  group: opensearch
   kind: OpensearchDashboard
   path: github.com/rancher/opni-opensearch-operator/api/v1beta1
   version: v1beta1

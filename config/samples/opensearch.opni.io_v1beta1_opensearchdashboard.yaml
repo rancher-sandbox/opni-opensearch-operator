@@ -1,4 +1,4 @@
-apiVersion: opensearch.opni.io.my.domain/v1beta1
+apiVersion: opensearch.opni.io/v1beta1
 kind: OpensearchDashboard
 metadata:
   name: opensearchdashboard-sample

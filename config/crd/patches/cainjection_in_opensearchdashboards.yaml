@@ -4,4 +4,4 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: $(CERTIFICATE_NAMESPACE)/$(CERTIFICATE_NAME)
-  name: opensearchdashboards.opensearch.opni.io.my.domain
+  name: opensearchdashboards.opensearch.opni.io

@@ -25,13 +25,11 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	opensearchopniiov1beta1 "github.com/rancher/opni-opensearch-operator/api/v1beta1"
+	"github.com/rancher/opni-opensearch-operator/api"
 	"github.com/rancher/opni-opensearch-operator/controllers"
 	//+kubebuilder:scaffold:imports
 )
@@ -42,9 +40,7 @@ var (
 )
 
 func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
-	utilruntime.Must(opensearchopniiov1beta1.AddToScheme(scheme))
+	api.InitScheme(scheme)
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -71,24 +67,18 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "6ad0ae00.my.domain",
+		LeaderElectionID:       "6ad0ae00.opni.io",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	if err = (&controllers.OpensearchClusterReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	if err = (&controllers.OpensearchClusterReconciler{}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "OpensearchCluster")
 		os.Exit(1)
 	}
-	if err = (&controllers.OpensearchDashboardReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	if err = (&controllers.DashboardsReconciler{}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "OpensearchDashboard")
 		os.Exit(1)
 	}
