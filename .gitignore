@@ -13,3 +13,26 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+bin
+testbin/*
+*.test
+**/__debug_bin
+*.out
+.vscode
+.idea
+*.swp
+*~
+tilt_modules/
+tilt-options.yaml
+Dockerfile.dapper*
+*.DS_Store
+
+# Distribution/packaging
+dist/
+build/
+package/*
+!package/assets/
+/.dapper
+config/samples/_v1beta1_gpupolicyadapter-vgpu.yaml
+deploy/examples/gpu/vgpu.yaml

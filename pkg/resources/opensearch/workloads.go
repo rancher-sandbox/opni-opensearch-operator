@@ -119,7 +119,7 @@ func (r *Reconciler) opensearchPodTemplate(
 			Tolerations:  r.opensearchTolerations(labels.Role()),
 			Volumes: []corev1.Volume{
 				configVolume(),
-				internalusersVolume(),
+				internalusersVolume(r.opensearchCluster.Name),
 			},
 			ImagePullSecrets: imageSpec.ImagePullSecrets,
 		},
@@ -355,7 +355,8 @@ func internalusersVolumeMount() corev1.VolumeMount {
 	}
 }
 
-func internalusersVolume() corev1.Volume {
+func internalusersVolume(clusterName string) corev1.Volume {
+	internalUsersSecretName := fmt.Sprintf("%s%s", clusterName, internalUsersSecretSuffix)
 	return corev1.Volume{
 		Name: "internalusers",
 		VolumeSource: corev1.VolumeSource{

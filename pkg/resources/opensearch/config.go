@@ -21,10 +21,10 @@ import (
 )
 
 const (
-	passwordSecretName      = "opni-es-password"
-	internalUsersSecretName = "opni-es-internalusers"
-	internalUsersKey        = "internal_users.yml"
-	bcryptCost              = 5
+	internalUsersKey          = "internal_users.yml"
+	bcryptCost                = 5
+	passwordSecretSuffix      = "os-password"
+	internalUsersSecretSuffix = "os-internalusers"
 )
 
 var (
@@ -58,7 +58,7 @@ kibanaserver:
 )
 
 func (r *Reconciler) opensearchConfigSecret() resources.Resource {
-	secretName := "opni-es-config"
+	secretName := fmt.Sprintf("%s-os-config", r.opensearchCluster.Name)
 	if r.opensearchCluster.Spec.ConfigSecret != nil {
 		// If auth secret is provided, use it instead of creating a new one. If
 		// the secret doesn't exist, create one with the given name.
@@ -79,11 +79,16 @@ func (r *Reconciler) opensearchConfigSecret() resources.Resource {
 }
 
 func (r *Reconciler) opensearchPasswordResourcces() (err error) {
-	var password []byte
-	var hash []byte
-	var buffer bytes.Buffer
-	var passwordSecretRef *corev1.SecretKeySelector
-	var ok bool
+	var (
+		password          []byte
+		hash              []byte
+		buffer            bytes.Buffer
+		passwordSecretRef *corev1.SecretKeySelector
+		ok                bool
+
+		passwordSecretName      = fmt.Sprintf("%s-%s", r.opensearchCluster.Name, passwordSecretSuffix)
+		internalUsersSecretName = fmt.Sprintf("%s-%s", r.opensearchCluster.Name, internalUsersSecretSuffix)
+	)
 
 	lg := log.FromContext(r.ctx)
 	generatePassword := r.opensearchCluster.Status.Auth.GenerateOpensearchHash == nil || *r.opensearchCluster.Status.Auth.GenerateOpensearchHash
