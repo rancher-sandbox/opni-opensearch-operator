@@ -96,6 +96,19 @@ func (e OpensearchRole) GetTolerations(opensearchCluster *OpensearchCluster) []c
 	}
 }
 
+func (e OpensearchRole) GetExtraEnvVars(opensearchCluster *OpensearchCluster) []corev1.EnvVar {
+	switch e {
+	case OpensearchDataRole:
+		return opensearchCluster.Spec.Data.ExtraEnvVars
+	case OpensearchMasterRole:
+		return opensearchCluster.Spec.Master.ExtraEnvVars
+	case OpensearchClientRole:
+		return opensearchCluster.Spec.Client.ExtraEnvVars
+	default:
+		return []corev1.EnvVar{}
+	}
+}
+
 func (c *OpensearchCluster) GetState() string {
 	return string(c.Status.State)
 }

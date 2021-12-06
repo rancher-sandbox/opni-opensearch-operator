@@ -346,6 +346,11 @@ func (in *OpensearchClusterSpec) DeepCopyInto(out *OpensearchClusterSpec) {
 		*out = new(v1.LocalObjectReference)
 		**out = **in
 	}
+	if in.AuthConfigSecret != nil {
+		in, out := &in.AuthConfigSecret, &out.AuthConfigSecret
+		*out = new(v1.LocalObjectReference)
+		**out = **in
+	}
 	if in.AdminPasswordFrom != nil {
 		in, out := &in.AdminPasswordFrom, &out.AdminPasswordFrom
 		*out = new(v1.SecretKeySelector)
@@ -442,6 +447,13 @@ func (in *OpensearchWorkloadOptions) DeepCopyInto(out *OpensearchWorkloadOptions
 		in, out := &in.Persistence, &out.Persistence
 		*out = new(PersistenceSpec)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.ExtraEnvVars != nil {
+		in, out := &in.ExtraEnvVars, &out.ExtraEnvVars
+		*out = make([]v1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 

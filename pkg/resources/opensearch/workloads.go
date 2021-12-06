@@ -14,6 +14,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+const (
+	securityConfigPath  = "/usr/share/opensearch/plugins/opensearch-security/securityconfig/"
+	authConfigSecretKey = "config.yml"
+)
+
 func (r *Reconciler) opensearchWorkloads() []resources.Resource {
 	return []resources.Resource{
 		r.opensearchMasterWorkload(),
@@ -60,7 +65,7 @@ func (r *Reconciler) opensearchPodTemplate(
 	labels resources.OpensearchLabels,
 ) corev1.PodTemplateSpec {
 	imageSpec := r.opensearchImageSpec()
-	return corev1.PodTemplateSpec{
+	podTemplate := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: labels,
 		},
@@ -124,6 +129,13 @@ func (r *Reconciler) opensearchPodTemplate(
 			ImagePullSecrets: imageSpec.ImagePullSecrets,
 		},
 	}
+
+	if r.opensearchCluster.Spec.AuthConfigSecret != nil {
+		podTemplate.Spec.Volumes = append(podTemplate.Spec.Volumes, r.authConfigVolume())
+		podTemplate.Spec.Containers[0].VolumeMounts = append(podTemplate.Spec.Containers[0].VolumeMounts, r.authConfigVolumeMount())
+	}
+
+	return podTemplate
 }
 
 func containerPortsForRole(role v1beta1.OpensearchRole) []corev1.ContainerPort {
@@ -350,7 +362,7 @@ func configVolume() corev1.Volume {
 func internalusersVolumeMount() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      "internalusers",
-		MountPath: fmt.Sprintf("/usr/share/opensearch/plugins/opensearch-security/securityconfig/%s", internalUsersKey),
+		MountPath: fmt.Sprintf("%s%s", securityConfigPath, internalUsersKey),
 		SubPath:   internalUsersKey,
 	}
 }
@@ -362,6 +374,25 @@ func internalusersVolume(clusterName string) corev1.Volume {
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
 				SecretName: internalUsersSecretName,
+			},
+		},
+	}
+}
+
+func (r *Reconciler) authConfigVolumeMount() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      "authconfig",
+		MountPath: fmt.Sprintf("%s%s", securityConfigPath, authConfigSecretKey),
+		SubPath:   authConfigSecretKey,
+	}
+}
+
+func (r *Reconciler) authConfigVolume() corev1.Volume {
+	return corev1.Volume{
+		Name: "authconfig",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: r.opensearchCluster.Spec.AuthConfigSecret.Name,
 			},
 		},
 	}

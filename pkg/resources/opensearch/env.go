@@ -77,6 +77,7 @@ func (r *Reconciler) opensearchNodeTypeEnv(role v1beta1.OpensearchRole) []corev1
 			Value: fmt.Sprintf("%s-%s-0", r.opensearchCluster.Name, OpensearchMasterSuffix),
 		})
 	}
+	envVars = append(envVars, role.GetExtraEnvVars(r.opensearchCluster)...)
 	return envVars
 }
 

@@ -34,6 +34,12 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 						StorageClassName: pointer.String("test-storageclass"),
 						Request:          resource.MustParse("5Gi"),
 					},
+					ExtraEnvVars: []corev1.EnvVar{
+						{
+							Name:  "foo",
+							Value: "bar",
+						},
+					},
 				},
 				Data: v1beta1.OpensearchWorkloadOptions{
 					Replicas: pointer.Int32(2),
@@ -72,8 +78,8 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 		wg := sync.WaitGroup{}
 		wg.Add(3)
 		go func() {
-			defer GinkgoRecover()
 			defer wg.Done()
+			defer GinkgoRecover()
 			Eventually(Object(&appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster-os-master",
@@ -99,7 +105,10 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 				HaveMatchingContainer(And(
 					HaveName("opensearch"),
 					HaveImage("docker.io/opensearchproject/opensearch:1.0.0"),
-					HaveEnv("node.master", "true"),
+					HaveEnv(
+						"node.master", "true",
+						"foo", "bar",
+					),
 					HavePorts("transport", "http", "metrics", "rca"),
 					HaveVolumeMounts("config", "opensearch-data"),
 					HaveVolumeMounts("internalusers", "test-cluster-os-internalusers"),
@@ -111,8 +120,8 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 			))
 		}()
 		go func() {
-			defer GinkgoRecover()
 			defer wg.Done()
+			defer GinkgoRecover()
 			Eventually(Object(&appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster-os-data",
@@ -150,8 +159,8 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 			))
 		}()
 		go func() {
-			defer GinkgoRecover()
 			defer wg.Done()
+			defer GinkgoRecover()
 			Eventually(Object(&appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster-os-client",
@@ -241,6 +250,86 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 				Namespace: osCluster.Namespace,
 			},
 		})).Should(HaveReplicaCount(1))
+	})
+	It("should create a auth config mount", func() {
+		authConfigSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-config",
+				Namespace: osCluster.Namespace,
+			},
+			Data: map[string][]byte{
+				"config.yml": []byte("this is some test data"),
+			},
+		}
+		Expect(k8sClient.Create(context.Background(), authConfigSecret)).To(Succeed())
+
+		updateObject(osCluster, func(obj *v1beta1.OpensearchCluster) {
+			obj.Spec.AuthConfigSecret = &corev1.LocalObjectReference{
+				Name: authConfigSecret.Name,
+			}
+		})
+
+		wg := sync.WaitGroup{}
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			defer GinkgoRecover()
+			Eventually(Object(&appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster-os-master",
+					Namespace: osCluster.Namespace,
+				},
+			})).Should(ExistAnd(
+				HaveMatchingVolume(And(
+					HaveName("authconfig"),
+					HaveVolumeSource("Secret"),
+				)),
+				HaveMatchingContainer(And(
+					HaveName("opensearch"),
+					HaveVolumeMounts("authconfig", authConfigSecret.Name),
+				)),
+			))
+		}()
+		go func() {
+			defer wg.Done()
+			defer GinkgoRecover()
+			Eventually(Object(&appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster-os-data",
+					Namespace: osCluster.Namespace,
+				},
+			})).Should(ExistAnd(
+				HaveMatchingVolume(And(
+					HaveName("authconfig"),
+					HaveVolumeSource("Secret"),
+				)),
+				HaveMatchingContainer(And(
+					HaveName("opensearch"),
+					HaveVolumeMounts("authconfig", authConfigSecret.Name),
+				)),
+			))
+		}()
+		go func() {
+			defer wg.Done()
+			defer GinkgoRecover()
+			Eventually(Object(&appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster-os-client",
+					Namespace: osCluster.Namespace,
+				},
+			})).Should(ExistAnd(
+				HaveMatchingVolume(And(
+					HaveName("authconfig"),
+					HaveVolumeSource("Secret"),
+				)),
+				HaveMatchingContainer(And(
+					HaveName("opensearch"),
+					HaveVolumeMounts("authconfig", authConfigSecret.Name),
+				)),
+			))
+		}()
+		wg.Wait()
+
 	})
 	It("should remove the resources when deleted", func() {
 		Expect(k8sClient.Delete(context.Background(), osCluster)).To(Succeed())

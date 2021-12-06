@@ -27,12 +27,11 @@ tilt_modules/
 tilt-options.yaml
 Dockerfile.dapper*
 *.DS_Store
+**/manager
 
 # Distribution/packaging
 dist/
 build/
-package/*
-!package/assets/
 /.dapper
 config/samples/_v1beta1_gpupolicyadapter-vgpu.yaml
 deploy/examples/gpu/vgpu.yaml

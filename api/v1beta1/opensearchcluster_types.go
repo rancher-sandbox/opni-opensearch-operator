@@ -36,7 +36,9 @@ type OpensearchClusterSpec struct {
 	// Secret containing an item "logging.yml" with the contents of the
 	// elasticsearch logging config.
 	ConfigSecret *corev1.LocalObjectReference `json:"configSecret,omitempty"`
-	// Reference to a secret containing the desired admin password
+	// Reference to a secret containing the auth config.  Must be a key called config.yml
+	AuthConfigSecret *corev1.LocalObjectReference `json:"authConfigSecret,omitempty"`
+	// Reference to a secret key containing the desired admin password
 	AdminPasswordFrom  *corev1.SecretKeySelector `json:"adminPasswordFrom,omitempty"`
 	Master             OpensearchWorkloadOptions `json:"master,omitempty"`
 	Data               OpensearchWorkloadOptions `json:"data,omitempty"`
@@ -52,6 +54,7 @@ type OpensearchWorkloadOptions struct {
 	NodeSelector map[string]string            `json:"nodeSelector,omitempty"`
 	Tolerations  []corev1.Toleration          `json:"tolerations,omitempty"`
 	Persistence  *PersistenceSpec             `json:"persistence,omitempty"`
+	ExtraEnvVars []corev1.EnvVar              `json:"extraEnvVars,omitempty"`
 }
 
 type PersistenceSpec struct {
