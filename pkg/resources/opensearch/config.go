@@ -55,6 +55,27 @@ kibanaserver:
   reserved: true
   description: "Kibana server user"
 `))
+
+	defaultConfig = `network.host: 0.0.0.0
+plugins.security.ssl.transport.pemcert_filepath: certs/transport.crt
+plugins.security.ssl.transport.pemkey_filepath: certs/transport.key
+plugins.security.ssl.transport.pemtrustedcas_filepath: certs/transportca.crt
+plugins.security.ssl.transport.enforce_hostname_verification: false
+plugins.security.ssl.transport.resolve_hostname: false
+plugins.security.ssl.http.enabled: true
+plugins.security.ssl.http.pemcert_filepath: certs/http.crt
+plugins.security.ssl.http.pemkey_filepath: certs/http.key
+plugins.security.ssl.http.pemtrustedcas_filepath: certs/httpca.crt
+plugins.security.allow_unsafe_democertificates: false
+plugins.security.allow_default_init_securityindex: true
+plugins.security.audit.type: internal_opensearch
+plugins.security.enable_snapshot_restore_privilege: true
+plugins.security.check_snapshot_restore_write_privileges: true
+plugins.security.restapi.roles_enabled: ["all_access", "security_rest_api_access"]
+plugins.security.system_indices.enabled: true
+plugins.security.system_indices.indices: [".opendistro-alerting-config", ".opendistro-alerting-alert*", ".opendistro-anomaly-results*", ".opendistro-anomaly-detector*", ".opendistro-anomaly-checkpoints", ".opendistro-anomaly-detection-state", ".opendistro-reports-*", ".opendistro-notifications-*", ".opendistro-notebooks", ".opendistro-asynchronous-search-response*", ".replication-metadata-store"]
+node.max_local_storage_nodes: 3
+`
 )
 
 func (r *Reconciler) opensearchConfigSecret() resources.Resource {
@@ -70,7 +91,8 @@ func (r *Reconciler) opensearchConfigSecret() resources.Resource {
 			Namespace: r.opensearchCluster.Namespace,
 		},
 		StringData: map[string]string{
-			"logging.yml": defaultLoggingConfig,
+			"logging.yml":    defaultLoggingConfig,
+			"opensearch.yml": defaultConfig,
 		},
 	}
 

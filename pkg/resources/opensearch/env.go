@@ -30,10 +30,6 @@ var (
 			},
 		},
 		{
-			Name:  "discovery.seed_hosts",
-			Value: "opni-es-discovery",
-		},
-		{
 			Name: "KUBERNETES_NAMESPACE",
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
@@ -68,7 +64,7 @@ func (r *Reconciler) opensearchNodeTypeEnv(role v1beta1.OpensearchRole) []corev1
 		},
 		{
 			Name:  "discovery.seed_hosts",
-			Value: fmt.Sprintf("%s-os-discovery", r.opensearchCluster.Name),
+			Value: fmt.Sprintf("%s-os-discovery.%s", r.opensearchCluster.Name, r.opensearchCluster.Namespace),
 		},
 	}
 	if role == v1beta1.OpensearchMasterRole && (r.masterSingleton() || !r.opensearchCluster.Status.Initialized) {
@@ -130,21 +126,11 @@ func (r *Reconciler) esPasswordEnv() []corev1.EnvVar {
 	}
 }
 
-func (r *Reconciler) masterSingleton() bool {
-	return (r.opensearchCluster.Spec.Master.Replicas == nil ||
-		*r.opensearchCluster.Spec.Master.Replicas == int32(1)) &&
-		(r.opensearchCluster.Spec.Master.Persistence == nil ||
-			!r.opensearchCluster.Spec.Master.Persistence.Enabled)
-}
-
 func javaOpts(req *corev1.ResourceRequirements) string {
 	if memLimit, ok := req.Limits[corev1.ResourceMemory]; ok {
-		return fmt.Sprintf("-Xms%[1]dm -Xmx%[1]dm", memLimit.ScaledValue(resource.Mega)/2)
+		return fmt.Sprintf("-Dlog4j2.formatMsgNoLookups=true -Xms%[1]dm -Xmx%[1]dm", memLimit.ScaledValue(resource.Mega)/2)
 	}
-	if memReq, ok := req.Requests[corev1.ResourceMemory]; ok {
-		return fmt.Sprintf("-Xms%[1]dm -Xmx%[1]dm", memReq.ScaledValue(resource.Mega)/2)
-	}
-	return "-Xms512m -Xmx512m"
+	return "-Dlog4j2.formatMsgNoLookups=true -Xms512m -Xmx512m"
 }
 
 func combineEnvVars(envVars ...[]corev1.EnvVar) (result []corev1.EnvVar) {

@@ -10,6 +10,7 @@ import (
 	"github.com/opensearch-project/opensearch-go"
 	"github.com/rancher/opni-opensearch-operator/api/v1beta1"
 	"github.com/rancher/opni-opensearch-operator/pkg/resources"
+	"github.com/rancher/opni-opensearch-operator/pkg/resources/opensearch/certs"
 	"github.com/rancher/opni/pkg/util"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -90,6 +91,18 @@ func (r *Reconciler) Reconcile() (retResult *reconcile.Result, retErr error) {
 		}
 	}()
 
+	allResources := []resources.Resource{}
+
+	recreateCerts := !(r.masterSingleton() || r.dataSingleton())
+	certsReconciler := certs.NewCertsReconciler(r.ctx, r.client, recreateCerts, r.opensearchCluster)
+	certResources, err := certsReconciler.CertSecrets()
+	if err != nil {
+		retErr = errors.Combine(retErr, err)
+		conditions = append(conditions, err.Error())
+		lg.Error(err, "Error when reconciling opensearch certs.")
+		return
+	}
+
 	osResources, err := r.OpensearchResources()
 	if err != nil {
 		retErr = errors.Combine(retErr, err)
@@ -98,7 +111,10 @@ func (r *Reconciler) Reconcile() (retResult *reconcile.Result, retErr error) {
 		return
 	}
 
-	for _, factory := range osResources {
+	allResources = append(allResources, certResources...)
+	allResources = append(allResources, osResources...)
+
+	for _, factory := range allResources {
 		o, state, err := factory()
 		if err != nil {
 			retErr = errors.WrapIf(err, "failed to create object")
@@ -155,18 +171,12 @@ func (r *Reconciler) ReconcileOpensearchUpgrade() (retResult *reconcile.Result, 
 	}
 
 	// If no persistence and only one data replica we can't safely upgrade so log an error and return
-	if (r.opensearchCluster.Spec.Data.Replicas == nil ||
-		*r.opensearchCluster.Spec.Data.Replicas == int32(1)) &&
-		(r.opensearchCluster.Spec.Data.Persistence == nil ||
-			!r.opensearchCluster.Spec.Data.Persistence.Enabled) {
+	if r.dataSingleton() {
 		lg.Error(ErrOpensearchUpgradeFailed, "insufficient data node persistence")
 		return
 	}
 
-	if (r.opensearchCluster.Spec.Master.Replicas == nil ||
-		*r.opensearchCluster.Spec.Master.Replicas == int32(1)) &&
-		(r.opensearchCluster.Spec.Master.Persistence == nil ||
-			!r.opensearchCluster.Spec.Master.Persistence.Enabled) {
+	if r.masterSingleton() {
 		lg.Error(ErrOpensearchUpgradeFailed, "insufficient master node persistence")
 		return
 	}
@@ -207,4 +217,18 @@ func (r *Reconciler) OpensearchResources() (resourceList []resources.Resource, _
 	resourceList = append(resourceList, r.opensearchConfigSecret())
 	resourceList = append(resourceList, r.opensearchWorkloads()...)
 	return
+}
+
+func (r *Reconciler) masterSingleton() bool {
+	return (r.opensearchCluster.Spec.Master.Replicas == nil ||
+		*r.opensearchCluster.Spec.Master.Replicas == int32(1)) &&
+		(r.opensearchCluster.Spec.Master.Persistence == nil ||
+			!r.opensearchCluster.Spec.Master.Persistence.Enabled)
+}
+
+func (r *Reconciler) dataSingleton() bool {
+	return (r.opensearchCluster.Spec.Data.Replicas == nil ||
+		*r.opensearchCluster.Spec.Data.Replicas == int32(1)) &&
+		(r.opensearchCluster.Spec.Data.Persistence == nil ||
+			!r.opensearchCluster.Spec.Data.Persistence.Enabled)
 }

@@ -81,7 +81,9 @@ func (r *Reconciler) opensearchPodTemplate(
 					Ports:           containerPortsForRole(labels.Role()),
 					VolumeMounts: []corev1.VolumeMount{
 						configVolumeMount(),
+						loggingConfigVolumeMount(),
 						internalusersVolumeMount(),
+						certsVolumeMount(),
 					},
 					LivenessProbe: &corev1.Probe{
 						InitialDelaySeconds: 60,
@@ -123,8 +125,9 @@ func (r *Reconciler) opensearchPodTemplate(
 			NodeSelector: r.opensearchNodeSelector(labels.Role()),
 			Tolerations:  r.opensearchTolerations(labels.Role()),
 			Volumes: []corev1.Volume{
-				configVolume(),
+				configVolume(r.opensearchCluster.Name),
 				internalusersVolume(r.opensearchCluster.Name),
+				certsVolume(r.opensearchCluster.Name),
 			},
 			ImagePullSecrets: imageSpec.ImagePullSecrets,
 		},
@@ -340,7 +343,7 @@ func dataVolumeMount() corev1.VolumeMount {
 	}
 }
 
-func configVolumeMount() corev1.VolumeMount {
+func loggingConfigVolumeMount() corev1.VolumeMount {
 	return corev1.VolumeMount{
 		Name:      "config",
 		MountPath: "/usr/share/opensearch/config/logging.yml",
@@ -348,12 +351,20 @@ func configVolumeMount() corev1.VolumeMount {
 	}
 }
 
-func configVolume() corev1.Volume {
+func configVolumeMount() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      "config",
+		MountPath: "/usr/share/opensearch/config/opensearch.yml",
+		SubPath:   "opensearch.yml",
+	}
+}
+
+func configVolume(clusterName string) corev1.Volume {
 	return corev1.Volume{
 		Name: "config",
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
-				SecretName: "opni-es-config",
+				SecretName: fmt.Sprintf("%s-os-config", clusterName),
 			},
 		},
 	}
@@ -368,7 +379,7 @@ func internalusersVolumeMount() corev1.VolumeMount {
 }
 
 func internalusersVolume(clusterName string) corev1.Volume {
-	internalUsersSecretName := fmt.Sprintf("%s%s", clusterName, internalUsersSecretSuffix)
+	internalUsersSecretName := fmt.Sprintf("%s-%s", clusterName, internalUsersSecretSuffix)
 	return corev1.Volume{
 		Name: "internalusers",
 		VolumeSource: corev1.VolumeSource{
@@ -393,6 +404,24 @@ func (r *Reconciler) authConfigVolume() corev1.Volume {
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
 				SecretName: r.opensearchCluster.Spec.AuthConfigSecret.Name,
+			},
+		},
+	}
+}
+
+func certsVolumeMount() corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      "certs",
+		MountPath: "/usr/share/opensearch/config/certs",
+	}
+}
+
+func certsVolume(clusterName string) corev1.Volume {
+	return corev1.Volume{
+		Name: "certs",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: fmt.Sprintf("%s-os-certs", clusterName),
 			},
 		},
 	}
