@@ -56,6 +56,7 @@ kibanaserver:
   description: "Kibana server user"
 `))
 
+	// TODO: investigate alternatives for storing this config.
 	defaultConfig = `network.host: 0.0.0.0
 plugins.security.ssl.transport.pemcert_filepath: certs/transport.crt
 plugins.security.ssl.transport.pemkey_filepath: certs/transport.key

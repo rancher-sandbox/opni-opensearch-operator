@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/asn1"
 	"encoding/pem"
 	"math/big"
 	"time"
@@ -20,8 +19,12 @@ const (
 )
 
 func CreateCA(commonName string) (ca []byte, cakey []byte, err error) {
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return
+	}
 	caCertTemplate := &x509.Certificate{
-		SerialNumber: big.NewInt(2021),
+		SerialNumber: serial,
 		Subject: pkix.Name{
 			Organization: []string{"SUSE Rancher"},
 			Country:      []string{"US"},
@@ -31,8 +34,7 @@ func CreateCA(commonName string) (ca []byte, cakey []byte, err error) {
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().AddDate(10, 0, 0),
 		IsCA:                  true,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		BasicConstraintsValid: true,
 	}
 
@@ -97,18 +99,4 @@ func SignCertificate(ca *tls.Certificate, cert *x509.Certificate, pubKey *rsa.Pu
 	}
 
 	return certPEMBuffer.Bytes(), nil
-}
-
-func ConvertRSAToPKCS8(key *rsa.PrivateKey) ([]byte, error) {
-	info := struct {
-		Version             int
-		PrivateKeyAlgorithm []asn1.ObjectIdentifier
-		PrivateKey          []byte
-	}{}
-	info.Version = 0
-	info.PrivateKeyAlgorithm = make([]asn1.ObjectIdentifier, 1)
-	info.PrivateKeyAlgorithm[0] = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
-	info.PrivateKey = x509.MarshalPKCS1PrivateKey(key)
-
-	return asn1.Marshal(info)
 }

@@ -113,19 +113,14 @@ func (c *CertsReconciler) maybeUpdateTransportCA() (ca []byte, key []byte, err e
 		return
 	}
 
-	// if pki.CertExpiring(c.transportCA.Certificate[0]) {
-	// 	if c.recreateCerts {
-	// 		ca, key, err = pki.CreateCA("Opensearch Transport CA")
-	// 	} else {
-	// 		err = pki.ErrCertExpiring
-	// 		return
-	// 	}
-	// }
 	return
 }
 
 func (c *CertsReconciler) createTransportCert() (cert []byte, key []byte, err error) {
 	// We have to add RID Name for the Transport certs
+	// The oid is 1.2.3.4.5.5.  0x88 is the Tag and Class for RID, 0x5 is the length
+	// 0x2A is OID standard for the first two numbers - 40 * 1 + 2
+	// https://www.alvestrand.no/objectid/2.5.29.17.html for details
 	rawValues := []asn1.RawValue{
 		{FullBytes: []byte{0x88, 0x05, 0x2A, 0x03, 0x04, 0x05, 0x05}},
 	}
@@ -140,10 +135,18 @@ func (c *CertsReconciler) createTransportCert() (cert []byte, key []byte, err er
 		rawValues = append(rawValues, asn1.RawValue{Tag: 2, Class: 2, Bytes: []byte(name)})
 	}
 
-	rawByte, _ := asn1.Marshal(rawValues)
+	rawByte, err := asn1.Marshal(rawValues)
+	if err != nil {
+		return
+	}
+
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return
+	}
 
 	transportCert := &x509.Certificate{
-		SerialNumber: big.NewInt(1658),
+		SerialNumber: serial,
 		Subject: pkix.Name{
 			Organization: []string{"SUSE Rancher"},
 			Country:      []string{"US"},
@@ -155,8 +158,9 @@ func (c *CertsReconciler) createTransportCert() (cert []byte, key []byte, err er
 		KeyUsage:    x509.KeyUsageDigitalSignature,
 		ExtraExtensions: []pkix.Extension{
 			{
-				Id:    asn1.ObjectIdentifier{2, 5, 29, 17},
-				Value: rawByte,
+				Id:       asn1.ObjectIdentifier{2, 5, 29, 17},
+				Critical: true,
+				Value:    rawByte,
 			},
 		},
 	}
@@ -169,7 +173,7 @@ func (c *CertsReconciler) createTransportCert() (cert []byte, key []byte, err er
 		return
 	}
 
-	pkcs8key, err := pki.ConvertRSAToPKCS8(keypair)
+	pkcs8key, err := x509.MarshalPKCS8PrivateKey(keypair)
 	if err != nil {
 		return
 	}
@@ -188,8 +192,28 @@ func (c *CertsReconciler) createTransportCert() (cert []byte, key []byte, err er
 }
 
 func (c *CertsReconciler) createRESTCert() (cert []byte, key []byte, err error) {
+	rawValues := []asn1.RawValue{}
+	dnsNames := []string{
+		fmt.Sprintf("*.%s", c.opensearchCluster.Namespace),
+		fmt.Sprintf("*.%s.svc", c.opensearchCluster.Namespace),
+		fmt.Sprintf("*.%s.cluster.local", c.opensearchCluster.Namespace),
+		fmt.Sprintf("*.%s.svc.cluster.local", c.opensearchCluster.Namespace),
+	}
+	for _, name := range dnsNames {
+		rawValues = append(rawValues, asn1.RawValue{Tag: 2, Class: 2, Bytes: []byte(name)})
+	}
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return
+	}
+
+	rawByte, err := asn1.Marshal(rawValues)
+	if err != nil {
+		return
+	}
+
 	restCert := &x509.Certificate{
-		SerialNumber: big.NewInt(1658),
+		SerialNumber: serial,
 		Subject: pkix.Name{
 			Organization: []string{"SUSE Rancher"},
 			Country:      []string{"US"},
@@ -199,11 +223,12 @@ func (c *CertsReconciler) createRESTCert() (cert []byte, key []byte, err error) 
 		NotAfter:    time.Now().AddDate(1, 0, 0),
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		KeyUsage:    x509.KeyUsageDigitalSignature,
-		DNSNames: []string{
-			fmt.Sprintf("*.%s", c.opensearchCluster.Namespace),
-			fmt.Sprintf("*.%s.svc", c.opensearchCluster.Namespace),
-			fmt.Sprintf("*.%s.cluster.local", c.opensearchCluster.Namespace),
-			fmt.Sprintf("*.%s.svc.cluster.local", c.opensearchCluster.Namespace),
+		ExtraExtensions: []pkix.Extension{
+			{
+				Id:       asn1.ObjectIdentifier{2, 5, 29, 17},
+				Critical: true,
+				Value:    rawByte,
+			},
 		},
 	}
 
@@ -216,7 +241,7 @@ func (c *CertsReconciler) createRESTCert() (cert []byte, key []byte, err error) 
 		return
 	}
 
-	pkcs8key, err := pki.ConvertRSAToPKCS8(keypair)
+	pkcs8key, err := x509.MarshalPKCS8PrivateKey(keypair)
 	if err != nil {
 		return
 	}
@@ -287,14 +312,6 @@ func (c *CertsReconciler) maybeUpdateRESTCA() (ca []byte, key []byte, err error)
 		return
 	}
 
-	// if pki.CertExpiring(c.restCA.Certificate[0]) {
-	// 	if c.recreateCerts {
-	// 		ca, key, err = pki.CreateCA("Opensearch REST CA")
-	// 	} else {
-	// 		err = pki.ErrCertExpiring
-	// 		return
-	// 	}
-	// }
 	return
 }
 
