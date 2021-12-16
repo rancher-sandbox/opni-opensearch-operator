@@ -74,7 +74,7 @@ const (
 )
 
 type AuthStatus struct {
-	GenerateOpensearchHash     *bool                     `json:"generateOpensearchHash"`
+	GenerateOpensearchHash     *bool                     `json:"generateOpensearchHash,omitempty"`
 	OpensearchAuthSecretKeyRef *corev1.SecretKeySelector `json:"elasticsearchAuthSecretKeyRef,omitempty"`
 }
 

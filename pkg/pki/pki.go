@@ -2,20 +2,35 @@ package pki
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
 	CertificatePEMType = "CERTIFICATE"
 	RSAKeyPEMType      = "RSA PRIVATE KEY"
 	PKCS8KeyPEMType    = "PRIVATE KEY"
+
+	TransportCASecretField    = "transportca.crt"
+	TransportCAKeySecretField = "transportca.key"
+	RESTCASecretField         = "httpca.crt"
+	RESTCAKeySecretField      = "httpca.key"
+	TransportCertField        = "transport.crt"
+	TransportKeyField         = "transport.key"
+	RESTCertField             = "http.crt"
+	RESTKeyField              = "http.key"
 )
 
 func CreateCA(commonName string) (ca []byte, cakey []byte, err error) {
@@ -99,4 +114,40 @@ func SignCertificate(ca *tls.Certificate, cert *x509.Certificate, pubKey *rsa.Pu
 	}
 
 	return certPEMBuffer.Bytes(), nil
+}
+
+func IsSecretDataMissing(err error) bool {
+	return err == ErrSecretDataMissing
+}
+
+func RetrieveCert(
+	certField string,
+	keyField string,
+	opensearchName string,
+	namespace string,
+	client client.Client,
+) (
+	cert []byte,
+	key []byte,
+	err error,
+) {
+	secret := &corev1.Secret{}
+
+	err = client.Get(context.Background(), types.NamespacedName{
+		Name:      fmt.Sprintf("%s-os-pki", opensearchName),
+		Namespace: namespace,
+	}, secret)
+
+	if err != nil {
+		return
+	}
+
+	var certOK, keyOK bool
+	cert, certOK = secret.Data[certField]
+	key, keyOK = secret.Data[keyField]
+	if !certOK || !keyOK {
+		err = ErrSecretDataMissing
+		return
+	}
+	return
 }

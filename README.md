@@ -122,11 +122,15 @@ spec:
 | affinity | No | [Affinity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core) | Affinity settings for the workload pods |
 | nodeSelector | No | map | NodeSelector for the workload pods.  If this exists it will override the globalNodeSelector |
 | tolerations | No | [Toleration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#toleration-v1-core) *array* | Tolerations for the workload.  These will be combined with the globalTolerations (if any) |
-| opensearch | No | [OpensearchClusterRef](#opensearchclusterref) | Reference to an existing OpensearchCluster to point the Dashboards deployment at |
+| opensearch | No | [LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#localobjectreference-v1-core)| Reference to an existing OpensearchCluster to point the Dashboards deployment at.  Must be in the same namespace |
+| opensearchConfig | No | [OpensearchConfigSpec](#opensearchconfigspec)| Configuration for an external Opensearch cluster |
+| tlsSecret | No | [LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#localobjectreference-v1-core)| A TLS secret containing the cert and key to use for Dashboards SSL.  If the opensearch field is preset this isn't required as it will reuse the Opensearch HTTP CA to generate a cert |
 
-#### OpensearchClusterRef
+#### OpensearchConfigSpec
 
 | Field | Required | Type | Description |
 |:------|:---------|:-----|:------------|
-| name | Yes | *string* | Name of the OpensearchCluster resource |
-| namespace | No | *string* | Namespace of the OpensearchCluster resource.  Defaults to the namespace of the Dashboards resource |
+| url | Yes | *string* | Endpoint for the Opensearch cluster |
+| username | Yes | *string* | Username to connect to the cluster with |
+| passwordFrom | Yes | [SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#secretkeyselector-v1-core) | Secret key which contains the password for the cluster |
+| verifySSL | No | *bool* | Whether to use strict SSL checking.  Defaults to true |

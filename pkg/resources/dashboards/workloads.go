@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/rancher/opni-opensearch-operator/api/v1beta1"
+	"github.com/rancher/opni-opensearch-operator/pkg/pki"
 	"github.com/rancher/opni-opensearch-operator/pkg/resources"
 	"github.com/rancher/opni-opensearch-operator/pkg/resources/opensearch"
 	appsv1 "k8s.io/api/apps/v1"
@@ -65,8 +66,9 @@ func (r *Reconciler) dashboardsWorkload() resources.Resource {
 								TimeoutSeconds:      10,
 								Handler: corev1.Handler{
 									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/api/status",
-										Port: intstr.FromInt(5601),
+										Path:   "/api/status",
+										Port:   intstr.FromInt(5601),
+										Scheme: corev1.URISchemeHTTPS,
 									},
 								},
 							},
@@ -84,15 +86,17 @@ func (r *Reconciler) dashboardsWorkload() resources.Resource {
 							},
 							Ports: []corev1.ContainerPort{
 								{
-									Name:          "http",
+									Name:          "https",
 									ContainerPort: 5601,
 								},
 							},
+							VolumeMounts: r.dashboardVolumeMounts(),
 						},
 					},
 					ImagePullSecrets: imageSpec.ImagePullSecrets,
 					NodeSelector:     r.dashboards.Spec.NodeSelector,
 					Tolerations:      r.dashboards.Spec.Tolerations,
+					Volumes:          r.dashboardVolumes(),
 				},
 			},
 		},
@@ -123,30 +127,126 @@ func (r *Reconciler) dashboardsImageSpec() v1beta1.ImageSpec {
 
 func (r *Reconciler) dashboardsEnv() (env []corev1.EnvVar, err error) {
 	if r.dashboards.Spec.OpensearchCluster != nil {
-		namespace := r.dashboards.Spec.OpensearchCluster.Namespace
-		if namespace == "" {
-			namespace = r.dashboards.Namespace
-		}
 		opensearchCluster := &v1beta1.OpensearchCluster{}
 		err = r.client.Get(r.ctx, types.NamespacedName{
 			Name:      r.dashboards.Spec.OpensearchCluster.Name,
-			Namespace: namespace,
+			Namespace: r.dashboards.Namespace,
 		}, opensearchCluster)
 		if err != nil {
 			return
 		}
 		env = append(env, corev1.EnvVar{
 			Name:  "OPENSEARCH_HOSTS",
-			Value: fmt.Sprintf("https://%s-%s.%s:9200", opensearchCluster.Name, opensearch.OpensearchClientSuffix, namespace),
+			Value: fmt.Sprintf("https://%s-%s.%s:9200", opensearchCluster.Name, resources.OpensearchClientSuffix, r.dashboards.Namespace),
 		})
-	} else {
-		_, err = url.ParseRequestURI(r.dashboards.Spec.OpensearchURL)
+		env = append(env, corev1.EnvVar{
+			Name: "OPENSEARCH_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: fmt.Sprintf("%s-%s", r.dashboards.Spec.OpensearchCluster.Name, opensearch.PasswordSecretSuffix),
+					},
+					Key: "dashboards",
+				},
+			},
+		})
+		env = append(env, corev1.EnvVar{
+			Name:  "OPENSEARCH_SSL_CERTIFICATEAUTHORITIES",
+			Value: fmt.Sprintf("/usr/share/opensearch-dashboards/%s", pki.RESTCASecretField),
+		})
+	} else if r.dashboards.Spec.OpensearchConfig != nil {
+		_, err = url.ParseRequestURI(r.dashboards.Spec.OpensearchConfig.URL)
 		if err != nil {
 			return env, ErrOpensearchURLInvalid
 		}
 		env = append(env, corev1.EnvVar{
 			Name:  "OPENSEARCH_HOSTS",
-			Value: r.dashboards.Spec.OpensearchURL,
+			Value: r.dashboards.Spec.OpensearchConfig.URL,
+		})
+		if r.dashboards.Spec.OpensearchConfig.VerifySSL != nil && !*r.dashboards.Spec.OpensearchConfig.VerifySSL {
+			env = append(env, corev1.EnvVar{
+				Name:  "OPENSEARCH_SSL_VERIFICATIONMODE",
+				Value: "none",
+			})
+		}
+		if r.dashboards.Spec.OpensearchConfig.Username != "" {
+			env = append(env, corev1.EnvVar{
+				Name:  "OPENSEARCH_USERNAME",
+				Value: r.dashboards.Spec.OpensearchConfig.Username,
+			})
+		}
+		if r.dashboards.Spec.OpensearchConfig.PasswordFrom != nil {
+			env = append(env, corev1.EnvVar{
+				Name: "OPENSEARCH_PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: r.dashboards.Spec.OpensearchConfig.PasswordFrom,
+				},
+			})
+		}
+	}
+	return
+}
+
+func (r *Reconciler) dashboardVolumes() (volumes []corev1.Volume) {
+	volumes = append(volumes, corev1.Volume{
+		Name: "certs",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: func() string {
+					if r.dashboards.Spec.TLSSecret != nil {
+						return r.dashboards.Spec.TLSSecret.Name
+					}
+					return fmt.Sprintf("%s-osdb-tls", r.dashboards.Name)
+				}(),
+			},
+		},
+	})
+	volumes = append(volumes, corev1.Volume{
+		Name: "config",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: fmt.Sprintf("%s-osdb-config", r.dashboards.Name),
+			},
+		},
+	})
+	if r.dashboards.Spec.OpensearchCluster != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "ca",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: fmt.Sprintf("%s-os-certs", r.dashboards.Spec.OpensearchCluster.Name),
+					Items: []corev1.KeyToPath{
+						{
+							Key:  pki.RESTCASecretField,
+							Path: pki.RESTCASecretField,
+						},
+					},
+				},
+			},
+		})
+	}
+	return
+}
+
+func (r *Reconciler) dashboardVolumeMounts() (volumeMounts []corev1.VolumeMount) {
+	volumeMounts = append(volumeMounts, corev1.VolumeMount{
+		Name:      "certs",
+		ReadOnly:  true,
+		MountPath: "/usr/share/opensearch-dashboards/tls",
+	})
+	volumeMounts = append(volumeMounts, corev1.VolumeMount{
+		Name:      "config",
+		SubPath:   "opensearch_dashboards.yml",
+		MountPath: "/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml",
+		ReadOnly:  true,
+	})
+
+	if r.dashboards.Spec.OpensearchCluster != nil {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "ca",
+			SubPath:   pki.RESTCASecretField,
+			MountPath: fmt.Sprintf("/usr/share/opensearch-dashboards/%s", pki.RESTCASecretField),
+			ReadOnly:  true,
 		})
 	}
 	return

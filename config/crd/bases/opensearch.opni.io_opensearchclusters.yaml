@@ -1535,8 +1535,6 @@ spec:
                     type: object
                   generateOpensearchHash:
                     type: boolean
-                required:
-                - generateOpensearchHash
                 type: object
               conditions:
                 items:

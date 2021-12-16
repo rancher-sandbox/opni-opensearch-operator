@@ -8,6 +8,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+const (
+	OpensearchDashboardsSuffix = "os-dashboards"
+	OpensearchMasterSuffix     = "os-master"
+	OpensearchDataSuffix       = "os-data"
+	OpensearchClientSuffix     = "os-client"
+)
+
 // ComponentReconciler reconciler interface
 type ComponentReconciler func() (*reconcile.Result, error)
 

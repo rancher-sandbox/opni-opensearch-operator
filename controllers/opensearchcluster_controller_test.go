@@ -221,7 +221,8 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 			},
 		})).Should(ExistAnd(
 			HaveOwner(osCluster),
-			HaveData("password", nil),
+			HaveData("admin", nil),
+			HaveData("dashboards", nil),
 		))
 		Eventually(Object(&corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{

@@ -33,7 +33,7 @@ func (r *Reconciler) opensearchDataWorkload() resources.Resource {
 
 	workload := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, OpensearchDataSuffix),
+			Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, resources.OpensearchDataSuffix),
 			Namespace: r.opensearchCluster.Namespace,
 			Labels:    labels,
 		},
@@ -165,7 +165,7 @@ func (r *Reconciler) opensearchMasterWorkload() resources.Resource {
 
 	workload := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, OpensearchMasterSuffix),
+			Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, resources.OpensearchMasterSuffix),
 			Namespace: r.opensearchCluster.Namespace,
 			Labels:    labels,
 		},
@@ -282,7 +282,7 @@ func (r *Reconciler) opensearchClientWorkload() resources.Resource {
 
 	workload := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, OpensearchClientSuffix),
+			Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, resources.OpensearchClientSuffix),
 			Namespace: r.opensearchCluster.Namespace,
 			Labels:    labels,
 		},

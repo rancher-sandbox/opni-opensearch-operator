@@ -20,19 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-const (
-	TransportCASecretField    = "transportca.crt"
-	TransportCAKeySecretField = "transportca.key"
-	RESTCASecretField         = "httpca.crt"
-	RESTCAKeySecretField      = "httpca.key"
-	TransportCertField        = "transport.crt"
-	TransportKeyField         = "transport.key"
-	RESTCertField             = "http.crt"
-	RESTKeyField              = "http.key"
 )
 
 type Reconciler struct {
@@ -71,38 +59,9 @@ func (c *Reconciler) setRESTCA(caPEM []byte, caKeyPEM []byte) (err error) {
 	return
 }
 
-func (c *Reconciler) retrieveCert(
-	certField string,
-	keyField string,
-) (
-	cert []byte,
-	key []byte,
-	err error,
-) {
-	secret := &corev1.Secret{}
-
-	err = c.client.Get(c.ctx, types.NamespacedName{
-		Name:      fmt.Sprintf("%s-os-pki", c.opensearchCluster.Name),
-		Namespace: c.opensearchCluster.Namespace,
-	}, secret)
-
-	if err != nil {
-		return
-	}
-
-	var certOK, keyOK bool
-	cert, certOK = secret.Data[certField]
-	key, keyOK = secret.Data[keyField]
-	if !certOK || !keyOK {
-		err = ErrSecretDataMissing
-		return
-	}
-	return
-}
-
 func (c *Reconciler) maybeUpdateTransportCA() (ca []byte, key []byte, err error) {
-	ca, key, err = c.retrieveCert(TransportCASecretField, TransportCAKeySecretField)
-	if k8serrors.IsNotFound(err) || (IsSecretDataMissing(err) && c.recreateCerts) {
+	ca, key, err = pki.RetrieveCert(pki.TransportCASecretField, pki.TransportCAKeySecretField, c.opensearchCluster.Name, c.opensearchCluster.Namespace, c.client)
+	if k8serrors.IsNotFound(err) || (pki.IsSecretDataMissing(err) && c.recreateCerts) {
 		ca, key, err = pki.CreateCA("Opensearch Transport CA")
 	}
 	if err != nil {
@@ -194,7 +153,7 @@ func (c *Reconciler) createTransportCert() (cert []byte, key []byte, err error) 
 func (c *Reconciler) createRESTCert() (cert []byte, key []byte, err error) {
 	rawValues := []asn1.RawValue{}
 	dnsNames := []string{
-		fmt.Sprintf("*.%s", c.opensearchCluster.Namespace),
+		fmt.Sprintf("%s-%s.%s", c.opensearchCluster.Name, "os-client", c.opensearchCluster.Namespace),
 		fmt.Sprintf("*.%s.svc", c.opensearchCluster.Namespace),
 		fmt.Sprintf("*.%s.cluster.local", c.opensearchCluster.Namespace),
 		fmt.Sprintf("*.%s.svc.cluster.local", c.opensearchCluster.Namespace),
@@ -260,8 +219,8 @@ func (c *Reconciler) createRESTCert() (cert []byte, key []byte, err error) {
 }
 
 func (c *Reconciler) maybeUpdateTransportCert() (cert []byte, key []byte, err error) {
-	cert, key, err = c.retrieveCert(TransportCertField, TransportKeyField)
-	if k8serrors.IsNotFound(err) || (IsSecretDataMissing(err) && c.recreateCerts) {
+	cert, key, err = pki.RetrieveCert(pki.TransportCertField, pki.TransportKeyField, c.opensearchCluster.Name, c.opensearchCluster.Namespace, c.client)
+	if k8serrors.IsNotFound(err) || (pki.IsSecretDataMissing(err) && c.recreateCerts) {
 		cert, key, err = c.createTransportCert()
 	}
 	if err != nil {
@@ -280,8 +239,8 @@ func (c *Reconciler) maybeUpdateTransportCert() (cert []byte, key []byte, err er
 }
 
 func (c *Reconciler) maybeUpdateRESTCert() (cert []byte, key []byte, err error) {
-	cert, key, err = c.retrieveCert(RESTCertField, RESTKeyField)
-	if k8serrors.IsNotFound(err) || (IsSecretDataMissing(err) && c.recreateCerts) {
+	cert, key, err = pki.RetrieveCert(pki.RESTCertField, pki.RESTKeyField, c.opensearchCluster.Name, c.opensearchCluster.Namespace, c.client)
+	if k8serrors.IsNotFound(err) || (pki.IsSecretDataMissing(err) && c.recreateCerts) {
 		cert, key, err = c.createRESTCert()
 	}
 	if err != nil {
@@ -300,9 +259,9 @@ func (c *Reconciler) maybeUpdateRESTCert() (cert []byte, key []byte, err error) 
 }
 
 func (c *Reconciler) maybeUpdateRESTCA() (ca []byte, key []byte, err error) {
-	ca, key, err = c.retrieveCert(RESTCASecretField, RESTCAKeySecretField)
-	if k8serrors.IsNotFound(err) || (IsSecretDataMissing(err) && c.recreateCerts) {
-		ca, key, err = pki.CreateCA("Opensearch REST CA")
+	ca, key, err = pki.RetrieveCert(pki.RESTCASecretField, pki.RESTCAKeySecretField, c.opensearchCluster.Name, c.opensearchCluster.Namespace, c.client)
+	if k8serrors.IsNotFound(err) || (pki.IsSecretDataMissing(err) && c.recreateCerts) {
+		ca, key, err = pki.CreateCA("Opensearch HTTP CA")
 	}
 	if err != nil {
 		return
@@ -335,35 +294,35 @@ func (c *Reconciler) CertSecrets() (resourceList []resources.Resource, err error
 	if err != nil {
 		return
 	}
-	secretPKI.Data[TransportCASecretField] = transportCA
-	secretCerts.Data[TransportCASecretField] = transportCA
-	secretPKI.Data[TransportCAKeySecretField] = transportCAKey
+	secretPKI.Data[pki.TransportCASecretField] = transportCA
+	secretCerts.Data[pki.TransportCASecretField] = transportCA
+	secretPKI.Data[pki.TransportCAKeySecretField] = transportCAKey
 
 	transportCert, transportKey, err := c.maybeUpdateTransportCert()
 	if err != nil {
 		return
 	}
-	secretPKI.Data[TransportCertField] = transportCert
-	secretCerts.Data[TransportCertField] = transportCert
-	secretPKI.Data[TransportKeyField] = transportKey
-	secretCerts.Data[TransportKeyField] = transportKey
+	secretPKI.Data[pki.TransportCertField] = transportCert
+	secretCerts.Data[pki.TransportCertField] = transportCert
+	secretPKI.Data[pki.TransportKeyField] = transportKey
+	secretCerts.Data[pki.TransportKeyField] = transportKey
 
 	restCA, restCAKey, err := c.maybeUpdateRESTCA()
 	if err != nil {
 		return
 	}
-	secretPKI.Data[RESTCASecretField] = restCA
-	secretCerts.Data[RESTCASecretField] = restCA
-	secretPKI.Data[RESTCAKeySecretField] = restCAKey
+	secretPKI.Data[pki.RESTCASecretField] = restCA
+	secretCerts.Data[pki.RESTCASecretField] = restCA
+	secretPKI.Data[pki.RESTCAKeySecretField] = restCAKey
 
 	restCert, restKey, err := c.maybeUpdateRESTCert()
 	if err != nil {
 		return
 	}
-	secretPKI.Data[RESTCertField] = restCert
-	secretCerts.Data[RESTCertField] = restCert
-	secretPKI.Data[RESTKeyField] = restKey
-	secretCerts.Data[RESTKeyField] = restKey
+	secretPKI.Data[pki.RESTCertField] = restCert
+	secretCerts.Data[pki.RESTCertField] = restCert
+	secretPKI.Data[pki.RESTKeyField] = restKey
+	secretCerts.Data[pki.RESTKeyField] = restKey
 
 	//ctrl.SetControllerReference(c.opensearchCluster, secret, c.client.Scheme())
 	resourceList = append(resourceList, resources.Present(secretPKI))

@@ -20,12 +20,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const (
-	OpensearchMasterSuffix = "os-master"
-	OpensearchDataSuffix   = "os-data"
-	OpensearchClientSuffix = "os-client"
-)
-
 var (
 	ErrOpensearchUpgradeFailed = errors.New("opensearch upgrade failed")
 )
@@ -137,7 +131,7 @@ func (r *Reconciler) Reconcile() (retResult *reconcile.Result, retErr error) {
 	// Check the status of the opensearch data statefulset and update status if it's ready
 	osData := &appsv1.StatefulSet{}
 	err = r.client.Get(r.ctx, types.NamespacedName{
-		Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, OpensearchDataSuffix),
+		Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, resources.OpensearchDataSuffix),
 		Namespace: r.opensearchCluster.Namespace,
 	}, osData)
 	if err != nil {
@@ -207,12 +201,7 @@ func (r *Reconciler) ReconcileOpensearchUpgrade() (retResult *reconcile.Result, 
 }
 
 func (r *Reconciler) OpensearchResources() (resourceList []resources.Resource, _ error) {
-	// Generate the elasticsearch password resources and return any errors
-	err := r.opensearchPasswordResourcces()
-	if err != nil {
-		return resourceList, err
-	}
-
+	resourceList = append(resourceList, r.internalUsersSecret())
 	resourceList = append(resourceList, r.opensearchServices()...)
 	resourceList = append(resourceList, r.opensearchConfigSecret())
 	resourceList = append(resourceList, r.opensearchWorkloads()...)

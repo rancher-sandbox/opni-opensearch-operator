@@ -13,7 +13,7 @@ import (
 
 var (
 	dashboardsPort = corev1.ServicePort{
-		Name:       "kibana",
+		Name:       "opensearch",
 		Port:       5601,
 		TargetPort: intstr.FromInt(5601),
 	}

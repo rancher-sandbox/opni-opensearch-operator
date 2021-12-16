@@ -10,6 +10,7 @@ import (
 	"github.com/opensearch-project/opensearch-go"
 	"github.com/opensearch-project/opensearch-go/opensearchapi"
 	"github.com/opensearch-project/opensearch-go/opensearchutil"
+	"github.com/rancher/opni-opensearch-operator/pkg/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +38,7 @@ type Persistent struct {
 func (r *Reconciler) UpgradeData() (retry bool, err error) {
 	statefulset := appsv1.StatefulSet{}
 	err = r.client.Get(r.ctx, types.NamespacedName{
-		Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, OpensearchDataSuffix),
+		Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, resources.OpensearchDataSuffix),
 		Namespace: r.opensearchCluster.Namespace,
 	}, &statefulset)
 	if err != nil {
@@ -137,7 +138,7 @@ func (r *Reconciler) UpgradeData() (retry bool, err error) {
 
 	r.client.Delete(r.ctx, &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s-%d", r.opensearchCluster.Name, OpensearchDataSuffix, deleteOrdinal),
+			Name:      fmt.Sprintf("%s-%s-%d", r.opensearchCluster.Name, resources.OpensearchDataSuffix, deleteOrdinal),
 			Namespace: r.opensearchCluster.Namespace,
 		},
 	})
@@ -165,7 +166,7 @@ func (r *Reconciler) createClient() error {
 	}
 	r.osClient, _ = opensearch.NewClient(opensearch.Config{
 		Addresses: []string{
-			fmt.Sprintf("https://%s-%s.%s:9200", r.opensearchCluster.Name, OpensearchClientSuffix, r.opensearchCluster.Namespace),
+			fmt.Sprintf("https://%s-%s.%s:9200", r.opensearchCluster.Name, resources.OpensearchClientSuffix, r.opensearchCluster.Namespace),
 		},
 		Username:             "admin",
 		Password:             password,

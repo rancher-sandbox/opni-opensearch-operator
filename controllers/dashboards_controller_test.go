@@ -35,7 +35,7 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 			},
 			Spec: v1beta1.DashboardsSpec{
 				Version: "1.0.0",
-				OpensearchCluster: &v1beta1.OpensearchClusterRef{
+				OpensearchCluster: &corev1.LocalObjectReference{
 					Name: "test-cluster",
 				},
 				NodeSelector: map[string]string{
