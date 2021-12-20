@@ -34,7 +34,11 @@ jobs:
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
-    - run: scripts/ci
+    - run: scripts/build
+    - uses: golangci/golangci-lint-action@v2
+      with:
+        version: v1.29
+    - run: scripts/validate
     - run: cp -r /bin/manager ./package/
     - if: ${{ startsWith(github.ref, 'refs/heads/') }}
       uses: docker/build-push-action@v2
