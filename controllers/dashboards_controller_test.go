@@ -75,7 +75,7 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 				HaveEnv(
 					"OPENSEARCH_HOSTS", fmt.Sprintf("https://test-cluster-os-client.%s:9200", dashboards.Namespace),
 				),
-				HavePorts("http"),
+				HavePorts("https"),
 			)),
 		))
 	})

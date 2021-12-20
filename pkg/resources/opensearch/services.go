@@ -55,9 +55,9 @@ func (r *Reconciler) opensearchServices() []resources.Resource {
 				rcaPort,
 			},
 			ClusterIP: corev1.ClusterIPNone,
-			Selector: map[string]string{
+			Selector: resources.CombineLabels(map[string]string{
 				"role": string(v1beta1.OpensearchDataRole),
-			},
+			}, resources.GenericLabels(r.opensearchCluster.Name)),
 		},
 	}
 	clientSvc := &corev1.Service{
@@ -74,9 +74,9 @@ func (r *Reconciler) opensearchServices() []resources.Resource {
 				rcaPort,
 			},
 			Type: corev1.ServiceTypeClusterIP,
-			Selector: map[string]string{
+			Selector: resources.CombineLabels(map[string]string{
 				"role": string(v1beta1.OpensearchClientRole),
-			},
+			}, resources.GenericLabels(r.opensearchCluster.Name)),
 		},
 	}
 	discoverySvc := &corev1.Service{
@@ -91,9 +91,9 @@ func (r *Reconciler) opensearchServices() []resources.Resource {
 				transportPort,
 			},
 			ClusterIP: corev1.ClusterIPNone,
-			Selector: map[string]string{
+			Selector: resources.CombineLabels(map[string]string{
 				"role": string(v1beta1.OpensearchMasterRole),
-			},
+			}, resources.GenericLabels(r.opensearchCluster.Name)),
 		},
 	}
 

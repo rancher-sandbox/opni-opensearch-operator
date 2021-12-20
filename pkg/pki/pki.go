@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -31,6 +32,10 @@ const (
 	TransportKeyField         = "transport.key"
 	RESTCertField             = "http.crt"
 	RESTKeyField              = "http.key"
+)
+
+var (
+	SANExtensionID = asn1.ObjectIdentifier{2, 5, 29, 17}
 )
 
 func CreateCA(commonName string) (ca []byte, cakey []byte, err error) {
@@ -83,6 +88,24 @@ func CreateCA(commonName string) (ca []byte, cakey []byte, err error) {
 	}
 
 	return caPEM.Bytes(), caKeyPEM.Bytes(), nil
+}
+
+func CertValidWithSANs(der []byte, sans pkix.Extension) bool {
+	cert, err := x509.ParseCertificate(der)
+	if err != nil {
+		return false
+	}
+	if cert.NotAfter.Before(time.Now().AddDate(0, 0, 10)) {
+		return false
+	}
+
+	for _, ext := range cert.Extensions {
+		if SANExtensionID.Equal(ext.Id) && bytes.Equal(sans.Value, ext.Value) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func CertExpiring(der []byte) bool {

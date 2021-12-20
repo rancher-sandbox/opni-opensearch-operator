@@ -55,13 +55,12 @@ kibanaserver:
   description: "Opensearch Dashboards user"
 `))
 
-	// TODO: investigate alternatives for storing this config.
+	// TODO: investigate alternatives for storing this config.  Tidy up and test the cert hostname generati
 	defaultConfig = `network.host: 0.0.0.0
-plugins.security.ssl.transport.pemcert_filepath: certs/transport.crt
-plugins.security.ssl.transport.pemkey_filepath: certs/transport.key
+plugins.security.ssl.transport.pemcert_filepath: certs/${HOSTNAME}.crt
+plugins.security.ssl.transport.pemkey_filepath: certs/${HOSTNAME}.key
 plugins.security.ssl.transport.pemtrustedcas_filepath: certs/transportca.crt
-plugins.security.ssl.transport.enforce_hostname_verification: false
-plugins.security.ssl.transport.resolve_hostname: false
+plugins.security.ssl.transport.enforce_hostname_verification: true
 plugins.security.ssl.http.enabled: true
 plugins.security.ssl.http.pemcert_filepath: certs/http.crt
 plugins.security.ssl.http.pemkey_filepath: certs/http.key

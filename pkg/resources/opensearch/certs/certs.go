@@ -10,8 +10,10 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
+	"net"
 	"time"
 
 	"github.com/rancher/opni-opensearch-operator/api/v1beta1"
@@ -21,6 +23,11 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+var (
+	ErrEmptyPodList = errors.New("no pods found")
 )
 
 type Reconciler struct {
@@ -75,7 +82,7 @@ func (c *Reconciler) maybeUpdateTransportCA() (ca []byte, key []byte, err error)
 	return
 }
 
-func (c *Reconciler) createTransportCert() (cert []byte, key []byte, err error) {
+func (c *Reconciler) createSANExtension(podName string, serviceName string, podIP net.IP) (pkix.Extension, error) {
 	// We have to add RID Name for the Transport certs
 	// The oid is 1.2.3.4.5.5.  0x88 is the Tag and Class for RID, 0x5 is the length
 	// 0x2A is OID standard for the first two numbers - 40 * 1 + 2
@@ -85,19 +92,36 @@ func (c *Reconciler) createTransportCert() (cert []byte, key []byte, err error) 
 	}
 	// Because we're manually adding the SAN extention we need to manually marshall the DNS names
 	dnsNames := []string{
-		fmt.Sprintf("*.%s", c.opensearchCluster.Namespace),
-		fmt.Sprintf("*.%s.svc", c.opensearchCluster.Namespace),
-		fmt.Sprintf("*.%s.cluster.local", c.opensearchCluster.Namespace),
-		fmt.Sprintf("*.%s.svc.cluster.local", c.opensearchCluster.Namespace),
+		fmt.Sprintf("%s.%s", serviceName, c.opensearchCluster.Namespace),
+		fmt.Sprintf("%s.%s.%s", podName, serviceName, c.opensearchCluster.Namespace),
+		fmt.Sprintf("%s.%s.svc", serviceName, c.opensearchCluster.Namespace),
+		fmt.Sprintf("%s.%s.%s.svc", podName, serviceName, c.opensearchCluster.Namespace),
+		fmt.Sprintf("%s.%s.svc.cluster.local", serviceName, c.opensearchCluster.Namespace),
+		fmt.Sprintf("%s.%s.%s.svc.cluster.local", podName, serviceName, c.opensearchCluster.Namespace),
 	}
 	for _, name := range dnsNames {
 		rawValues = append(rawValues, asn1.RawValue{Tag: 2, Class: 2, Bytes: []byte(name)})
 	}
 
+	ip := podIP.To4()
+	if ip == nil {
+		ip = podIP
+	}
+	rawValues = append(rawValues, asn1.RawValue{Tag: 7, Class: 2, Bytes: ip})
+
 	rawByte, err := asn1.Marshal(rawValues)
 	if err != nil {
-		return
+		return pkix.Extension{}, err
 	}
+
+	return pkix.Extension{
+		Id:       pki.SANExtensionID,
+		Critical: true,
+		Value:    rawByte,
+	}, nil
+}
+
+func (c *CertsReconciler) createTransportCert(san pkix.Extension) (cert []byte, key []byte, err error) {
 
 	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 	if err != nil {
@@ -116,11 +140,7 @@ func (c *Reconciler) createTransportCert() (cert []byte, key []byte, err error) 
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:    x509.KeyUsageDigitalSignature,
 		ExtraExtensions: []pkix.Extension{
-			{
-				Id:       asn1.ObjectIdentifier{2, 5, 29, 17},
-				Critical: true,
-				Value:    rawByte,
-			},
+			san,
 		},
 	}
 	keypair, err := rsa.GenerateKey(rand.Reader, 4096)
@@ -184,7 +204,7 @@ func (c *Reconciler) createRESTCert() (cert []byte, key []byte, err error) {
 		KeyUsage:    x509.KeyUsageDigitalSignature,
 		ExtraExtensions: []pkix.Extension{
 			{
-				Id:       asn1.ObjectIdentifier{2, 5, 29, 17},
+				Id:       pki.SANExtensionID,
 				Critical: true,
 				Value:    rawByte,
 			},
@@ -218,22 +238,29 @@ func (c *Reconciler) createRESTCert() (cert []byte, key []byte, err error) {
 	return
 }
 
-func (c *Reconciler) maybeUpdateTransportCert() (cert []byte, key []byte, err error) {
-	cert, key, err = pki.RetrieveCert(pki.TransportCertField, pki.TransportKeyField, c.opensearchCluster.Name, c.opensearchCluster.Namespace, c.client)
-	if k8serrors.IsNotFound(err) || (pki.IsSecretDataMissing(err) && c.recreateCerts) {
-		cert, key, err = c.createTransportCert()
+func (c *Reconciler) maybeUpdateTransportCert(podName string, serviceName string, podIP net.IP) (cert []byte, key []byte, err error) {
+	lg := log.FromContext(c.ctx)
+	sanExtension, err := c.createSANExtension(podName, serviceName, podIP)
+	if err != nil {
+		return
+	}
+	cert, key, err = pki.RetrieveCert(
+		fmt.Sprintf("%s.crt", podName),
+		fmt.Sprintf("%s.key", podName),
+		c.opensearchCluster.Name,
+		c.opensearchCluster.Namespace,
+		c.client,
+	)
+	if k8serrors.IsNotFound(err) || pki.IsSecretDataMissing(err) {
+		cert, key, err = c.createTransportCert(sanExtension)
 	}
 	if err != nil {
 		return
 	}
 	certBlock, _ := pem.Decode(cert)
-	if pki.CertExpiring(certBlock.Bytes) {
-		if c.recreateCerts {
-			cert, key, err = c.createTransportCert()
-		} else {
-			err = pki.ErrCertExpiring
-			return
-		}
+	if !pki.CertValidWithSANs(certBlock.Bytes, sanExtension) {
+		lg.V(1).Info("cert not valid so recreating")
+		cert, key, err = c.createTransportCert(sanExtension)
 	}
 	return
 }
@@ -298,14 +325,27 @@ func (c *Reconciler) CertSecrets() (resourceList []resources.Resource, err error
 	secretCerts.Data[pki.TransportCASecretField] = transportCA
 	secretPKI.Data[pki.TransportCAKeySecretField] = transportCAKey
 
-	transportCert, transportKey, err := c.maybeUpdateTransportCert()
+	// Update node certs for master nodes
+	podList := &corev1.PodList{}
+	err = c.client.List(c.ctx, podList, client.MatchingLabels(
+		resources.CombineLabels(resources.NewOpensearchLabels(), resources.GenericLabels(c.opensearchCluster.Name)),
+	))
 	if err != nil {
 		return
 	}
-	secretPKI.Data[pki.TransportCertField] = transportCert
-	secretCerts.Data[pki.TransportCertField] = transportCert
-	secretPKI.Data[pki.TransportKeyField] = transportKey
-	secretCerts.Data[pki.TransportKeyField] = transportKey
+	for _, pod := range podList.Items {
+		ip := net.ParseIP(pod.Status.PodIP)
+		if ip != nil {
+			transportCert, transportKey, err := c.maybeUpdateTransportCert(pod.Name, fmt.Sprintf("%s-os-discovery", c.opensearchCluster.Name), ip)
+			if err != nil {
+				return resourceList, err
+			}
+			secretPKI.Data[fmt.Sprintf("%s.crt", pod.Name)] = transportCert
+			secretCerts.Data[fmt.Sprintf("%s.crt", pod.Name)] = transportCert
+			secretPKI.Data[fmt.Sprintf("%s.key", pod.Name)] = transportKey
+			secretCerts.Data[fmt.Sprintf("%s.key", pod.Name)] = transportKey
+		}
+	}
 
 	restCA, restCAKey, err := c.maybeUpdateRESTCA()
 	if err != nil {
@@ -328,4 +368,8 @@ func (c *Reconciler) CertSecrets() (resourceList []resources.Resource, err error
 	resourceList = append(resourceList, resources.Present(secretPKI))
 	resourceList = append(resourceList, resources.Present(secretCerts))
 	return
+}
+
+func IsEmptyPodList(err error) bool {
+	return err == ErrEmptyPodList
 }

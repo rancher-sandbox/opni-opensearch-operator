@@ -15,6 +15,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -87,6 +88,14 @@ func (r *Reconciler) Reconcile() (retResult *reconcile.Result, retErr error) {
 
 	allResources := []resources.Resource{}
 
+	osResources, err := r.OpensearchResources()
+	if err != nil {
+		retErr = errors.Combine(retErr, err)
+		conditions = append(conditions, err.Error())
+		lg.Error(err, "Error when reconciling opensearch.")
+		return
+	}
+
 	recreateCerts := !(r.masterSingleton() || r.dataSingleton())
 	certsReconciler := certs.NewReconciler(r.ctx, r.client, recreateCerts, r.opensearchCluster)
 	certResources, err := certsReconciler.CertSecrets()
@@ -97,16 +106,8 @@ func (r *Reconciler) Reconcile() (retResult *reconcile.Result, retErr error) {
 		return
 	}
 
-	osResources, err := r.OpensearchResources()
-	if err != nil {
-		retErr = errors.Combine(retErr, err)
-		conditions = append(conditions, err.Error())
-		lg.Error(err, "Error when reconciling opensearch.")
-		return
-	}
-
-	allResources = append(allResources, certResources...)
 	allResources = append(allResources, osResources...)
+	allResources = append(allResources, certResources...)
 
 	for _, factory := range allResources {
 		o, state, err := factory()
@@ -128,7 +129,7 @@ func (r *Reconciler) Reconcile() (retResult *reconcile.Result, retErr error) {
 		}
 	}
 
-	// Check the status of the opensearch data statefulset and update status if it's ready
+	// If the statefulsets aren't ready just requeue so we can reconcile the certs
 	osData := &appsv1.StatefulSet{}
 	err = r.client.Get(r.ctx, types.NamespacedName{
 		Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, resources.OpensearchDataSuffix),
@@ -138,19 +139,29 @@ func (r *Reconciler) Reconcile() (retResult *reconcile.Result, retErr error) {
 		return nil, err
 	}
 
-	if osData.Spec.Replicas != nil && osData.Status.ReadyReplicas == *osData.Spec.Replicas {
-		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			if err := r.client.Get(r.ctx, client.ObjectKeyFromObject(r.opensearchCluster), r.opensearchCluster); err != nil {
-				return err
-			}
-			r.opensearchCluster.Status.Initialized = true
-			return r.client.Status().Update(r.ctx, r.opensearchCluster)
-		})
-		if err != nil {
-			return nil, err
-		}
+	osMaster := &appsv1.StatefulSet{}
+	err = r.client.Get(r.ctx, types.NamespacedName{
+		Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, resources.OpensearchMasterSuffix),
+		Namespace: r.opensearchCluster.Namespace,
+	}, osMaster)
+	if err != nil {
+		return nil, err
 	}
 
+	if pointer.Int32Deref(osData.Spec.Replicas, 1) != osData.Status.ReadyReplicas || pointer.Int32Deref(osMaster.Spec.Replicas, 1) != osMaster.Status.ReadyReplicas {
+		retResult = &reconcile.Result{
+			RequeueAfter: time.Second * 5,
+		}
+		return
+	}
+
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if err := r.client.Get(r.ctx, client.ObjectKeyFromObject(r.opensearchCluster), r.opensearchCluster); err != nil {
+			return err
+		}
+		r.opensearchCluster.Status.Initialized = true
+		return r.client.Status().Update(r.ctx, r.opensearchCluster)
+	})
 	if err != nil {
 		return nil, err
 	}

@@ -21,6 +21,13 @@ func CombineLabels(maps ...map[string]string) map[string]string {
 	return result
 }
 
+func GenericLabels(clusterName string) map[string]string {
+	return map[string]string{
+		AppNameLabel:          "opensearch",
+		OpensearchClusterName: clusterName,
+	}
+}
+
 type OpensearchLabels map[string]string
 
 func NewOpensearchLabels() OpensearchLabels {
