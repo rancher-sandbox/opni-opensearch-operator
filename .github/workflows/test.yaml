@@ -5,7 +5,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
       with:
@@ -23,3 +23,9 @@ jobs:
           ${{ runner.os }}-go-
     - run: hack/setup-envtest.sh
     - run: go test ./... -race -v --ginkgo.label-filter "(unit || controller)"
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: golangci/golangci-lint-action@v2
+      with:
+        version: v1.42

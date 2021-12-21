@@ -9,8 +9,15 @@ on:
 name: Build
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: golangci/golangci-lint-action@v2
+      with:
+        version: v1.42
   build:
     name: Build and push image
+    needs: lint
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -35,9 +42,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
     - run: scripts/build
-    - uses: golangci/golangci-lint-action@v2
-      with:
-        version: v1.29
     - run: scripts/validate
     - run: cp -r /bin/manager ./package/
     - if: ${{ startsWith(github.ref, 'refs/heads/') }}
