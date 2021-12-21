@@ -27,7 +27,7 @@ tilt_modules/
 tilt-options.yaml
 Dockerfile.dapper*
 *.DS_Store
-**/manager
+package/manager
 
 # Distribution/packaging
 dist/
