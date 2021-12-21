@@ -67,7 +67,7 @@ func (r *Reconciler) UpgradeData() (retry bool, err error) {
 		}
 		defer resp.Body.Close()
 		if resp.IsError() {
-			return false, fmt.Errorf("failed to check cluster settings: %s", resp.String())
+			return false, ErrClusterSettingsGetFailed(resp.String())
 		}
 
 		settings := ClusterSettings{}
@@ -95,7 +95,7 @@ func (r *Reconciler) UpgradeData() (retry bool, err error) {
 		}
 		defer resp.Body.Close()
 		if resp.IsError() {
-			return false, fmt.Errorf("failed to put cluster settings: %s", resp.String())
+			return false, ErrClusterSettingsPutFailed(resp.String())
 		}
 
 		return true, nil
@@ -125,7 +125,7 @@ func (r *Reconciler) UpgradeData() (retry bool, err error) {
 	}
 	defer resp.Body.Close()
 	if resp.IsError() {
-		return false, fmt.Errorf("failed to put cluster settings: %s", resp.String())
+		return false, ErrClusterSettingsPutFailed(resp.String())
 	}
 
 	var deleteOrdinal int
@@ -189,7 +189,7 @@ func (r *Reconciler) areShardsGreen() bool {
 	}
 	defer resp.Body.Close()
 	if resp.IsError() {
-		lg.Error(fmt.Errorf("%s", resp.String()), "failed to fetch cluster status")
+		lg.Error(ErrClusterStatusGetFailed(resp.String()), "failed to fetch cluster status")
 		return false
 	}
 

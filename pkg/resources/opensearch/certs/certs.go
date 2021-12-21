@@ -35,7 +35,7 @@ const (
 	RESTKeyField              = "http.key"
 )
 
-type CertsReconciler struct {
+type Reconciler struct {
 	opensearchCluster *v1beta1.OpensearchCluster
 	client            client.Client
 	ctx               context.Context
@@ -44,8 +44,8 @@ type CertsReconciler struct {
 	recreateCerts     bool
 }
 
-func NewCertsReconciler(ctx context.Context, client client.Client, recreateCerts bool, cluster *v1beta1.OpensearchCluster) *CertsReconciler {
-	return &CertsReconciler{
+func NewReconciler(ctx context.Context, client client.Client, recreateCerts bool, cluster *v1beta1.OpensearchCluster) *Reconciler {
+	return &Reconciler{
 		client:            client,
 		ctx:               ctx,
 		opensearchCluster: cluster,
@@ -53,7 +53,7 @@ func NewCertsReconciler(ctx context.Context, client client.Client, recreateCerts
 	}
 }
 
-func (c *CertsReconciler) setTransportCA(caPEM []byte, caKeyPEM []byte) (err error) {
+func (c *Reconciler) setTransportCA(caPEM []byte, caKeyPEM []byte) (err error) {
 	ca, err := tls.X509KeyPair(caPEM, caKeyPEM)
 	if err != nil {
 		return err
@@ -62,7 +62,7 @@ func (c *CertsReconciler) setTransportCA(caPEM []byte, caKeyPEM []byte) (err err
 	return
 }
 
-func (c *CertsReconciler) setRESTCA(caPEM []byte, caKeyPEM []byte) (err error) {
+func (c *Reconciler) setRESTCA(caPEM []byte, caKeyPEM []byte) (err error) {
 	ca, err := tls.X509KeyPair(caPEM, caKeyPEM)
 	if err != nil {
 		return err
@@ -71,7 +71,7 @@ func (c *CertsReconciler) setRESTCA(caPEM []byte, caKeyPEM []byte) (err error) {
 	return
 }
 
-func (c *CertsReconciler) retrieveCert(
+func (c *Reconciler) retrieveCert(
 	certField string,
 	keyField string,
 ) (
@@ -100,7 +100,7 @@ func (c *CertsReconciler) retrieveCert(
 	return
 }
 
-func (c *CertsReconciler) maybeUpdateTransportCA() (ca []byte, key []byte, err error) {
+func (c *Reconciler) maybeUpdateTransportCA() (ca []byte, key []byte, err error) {
 	ca, key, err = c.retrieveCert(TransportCASecretField, TransportCAKeySecretField)
 	if k8serrors.IsNotFound(err) || (IsSecretDataMissing(err) && c.recreateCerts) {
 		ca, key, err = pki.CreateCA("Opensearch Transport CA")
@@ -116,7 +116,7 @@ func (c *CertsReconciler) maybeUpdateTransportCA() (ca []byte, key []byte, err e
 	return
 }
 
-func (c *CertsReconciler) createTransportCert() (cert []byte, key []byte, err error) {
+func (c *Reconciler) createTransportCert() (cert []byte, key []byte, err error) {
 	// We have to add RID Name for the Transport certs
 	// The oid is 1.2.3.4.5.5.  0x88 is the Tag and Class for RID, 0x5 is the length
 	// 0x2A is OID standard for the first two numbers - 40 * 1 + 2
@@ -191,7 +191,7 @@ func (c *CertsReconciler) createTransportCert() (cert []byte, key []byte, err er
 	return
 }
 
-func (c *CertsReconciler) createRESTCert() (cert []byte, key []byte, err error) {
+func (c *Reconciler) createRESTCert() (cert []byte, key []byte, err error) {
 	rawValues := []asn1.RawValue{}
 	dnsNames := []string{
 		fmt.Sprintf("*.%s", c.opensearchCluster.Namespace),
@@ -259,7 +259,7 @@ func (c *CertsReconciler) createRESTCert() (cert []byte, key []byte, err error) 
 	return
 }
 
-func (c *CertsReconciler) maybeUpdateTransportCert() (cert []byte, key []byte, err error) {
+func (c *Reconciler) maybeUpdateTransportCert() (cert []byte, key []byte, err error) {
 	cert, key, err = c.retrieveCert(TransportCertField, TransportKeyField)
 	if k8serrors.IsNotFound(err) || (IsSecretDataMissing(err) && c.recreateCerts) {
 		cert, key, err = c.createTransportCert()
@@ -279,7 +279,7 @@ func (c *CertsReconciler) maybeUpdateTransportCert() (cert []byte, key []byte, e
 	return
 }
 
-func (c *CertsReconciler) maybeUpdateRESTCert() (cert []byte, key []byte, err error) {
+func (c *Reconciler) maybeUpdateRESTCert() (cert []byte, key []byte, err error) {
 	cert, key, err = c.retrieveCert(RESTCertField, RESTKeyField)
 	if k8serrors.IsNotFound(err) || (IsSecretDataMissing(err) && c.recreateCerts) {
 		cert, key, err = c.createRESTCert()
@@ -299,7 +299,7 @@ func (c *CertsReconciler) maybeUpdateRESTCert() (cert []byte, key []byte, err er
 	return
 }
 
-func (c *CertsReconciler) maybeUpdateRESTCA() (ca []byte, key []byte, err error) {
+func (c *Reconciler) maybeUpdateRESTCA() (ca []byte, key []byte, err error) {
 	ca, key, err = c.retrieveCert(RESTCASecretField, RESTCAKeySecretField)
 	if k8serrors.IsNotFound(err) || (IsSecretDataMissing(err) && c.recreateCerts) {
 		ca, key, err = pki.CreateCA("Opensearch REST CA")
@@ -315,7 +315,7 @@ func (c *CertsReconciler) maybeUpdateRESTCA() (ca []byte, key []byte, err error)
 	return
 }
 
-func (c *CertsReconciler) CertSecrets() (resourceList []resources.Resource, err error) {
+func (c *Reconciler) CertSecrets() (resourceList []resources.Resource, err error) {
 	secretPKI := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-os-pki", c.opensearchCluster.Name),

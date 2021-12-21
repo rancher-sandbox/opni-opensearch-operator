@@ -8,5 +8,5 @@ var (
 )
 
 func IsSecretDataMissing(err error) bool {
-	return err == ErrSecretDataMissing
+	return errors.Is(err, ErrSecretDataMissing)
 }

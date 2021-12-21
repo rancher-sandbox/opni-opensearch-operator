@@ -94,7 +94,7 @@ func (r *Reconciler) Reconcile() (retResult *reconcile.Result, retErr error) {
 	allResources := []resources.Resource{}
 
 	recreateCerts := !(r.masterSingleton() || r.dataSingleton())
-	certsReconciler := certs.NewCertsReconciler(r.ctx, r.client, recreateCerts, r.opensearchCluster)
+	certsReconciler := certs.NewReconciler(r.ctx, r.client, recreateCerts, r.opensearchCluster)
 	certResources, err := certsReconciler.CertSecrets()
 	if err != nil {
 		retErr = errors.Combine(retErr, err)
