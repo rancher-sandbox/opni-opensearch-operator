@@ -2,7 +2,6 @@ package opensearch
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"text/template"
 
@@ -131,7 +130,7 @@ func (r *Reconciler) opensearchPasswordResourcces() (err error) {
 		}
 		password, ok = secret.Data[r.opensearchCluster.Spec.AdminPasswordFrom.Key]
 		if !ok {
-			return fmt.Errorf("%s key does not exist in %s", r.opensearchCluster.Spec.AdminPasswordFrom.Key, r.opensearchCluster.Spec.AdminPasswordFrom.Name)
+			return ErrSecretKeyNotExist(r.opensearchCluster.Spec.AdminPasswordFrom.Key, r.opensearchCluster.Spec.AdminPasswordFrom.Name)
 		}
 
 	} else {
@@ -162,14 +161,17 @@ func (r *Reconciler) opensearchPasswordResourcces() (err error) {
 
 			// If we can't get the secret return an error
 			if k8serrors.IsNotFound(err) {
-				retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 					if err := r.client.Get(r.ctx, client.ObjectKeyFromObject(r.opensearchCluster), r.opensearchCluster); err != nil {
 						return err
 					}
 					r.opensearchCluster.Status.Auth.GenerateOpensearchHash = pointer.BoolPtr(true)
 					return r.client.Status().Update(r.ctx, r.opensearchCluster)
 				})
-				return errors.New("password secret not found, will recreate on next loop")
+				if err != nil {
+					return err
+				}
+				return ErrPasswordSecretNotFound
 			} else if err != nil {
 				lg.Error(err, "failed to check password secret")
 				return err
@@ -197,9 +199,12 @@ func (r *Reconciler) opensearchPasswordResourcces() (err error) {
 
 		// Check the namespace for test annotation
 		ns := corev1.Namespace{}
-		r.client.Get(r.ctx, types.NamespacedName{
+		err = r.client.Get(r.ctx, types.NamespacedName{
 			Name: r.opensearchCluster.Namespace,
 		}, &ns)
+		if err != nil {
+			return
+		}
 
 		if value, ok := ns.Annotations["controller-test"]; ok && value == "true" {
 			lg.V(1).Info("test namespace, using minimum bcrypt difficulty to hash password")

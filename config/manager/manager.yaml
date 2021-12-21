@@ -27,7 +27,7 @@ spec:
         - /manager
         args:
         - --leader-elect
-        image: quay.io/dbason/opni-opensearch-operator:dev
+        image: ghcr.io/rancher-sandbox/opni-opensearch-operator
         name: manager
         securityContext:
           allowPrivilegeEscalation: false

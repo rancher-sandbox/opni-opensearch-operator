@@ -7,7 +7,6 @@ import (
 	"github.com/rancher/opni-opensearch-operator/pkg/resources"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -27,11 +26,6 @@ var (
 	rcaPort = corev1.ServicePort{
 		Name: "rca",
 		Port: 9650,
-	}
-	kibanaPort = corev1.ServicePort{
-		Name:       "kibana",
-		Port:       5601,
-		TargetPort: intstr.FromInt(5601),
 	}
 )
 

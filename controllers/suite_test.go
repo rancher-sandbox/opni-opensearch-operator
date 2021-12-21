@@ -52,7 +52,7 @@ var (
 )
 
 func TestAPIs(t *testing.T) {
-	SetDefaultEventuallyTimeout(30 * time.Second)
+	SetDefaultEventuallyTimeout(45 * time.Second)
 	// SetDefaultEventuallyTimeout(24 * time.Hour) // For debugging
 	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
 	SetDefaultConsistentlyDuration(2 * time.Second)
