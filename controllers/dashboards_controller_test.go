@@ -35,7 +35,7 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 			},
 			Spec: v1beta1.DashboardsSpec{
 				Version: "1.0.0",
-				OpensearchCluster: &v1beta1.OpensearchClusterRef{
+				OpensearchCluster: &corev1.LocalObjectReference{
 					Name: "test-cluster",
 				},
 				NodeSelector: map[string]string{
@@ -75,7 +75,7 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 				HaveEnv(
 					"OPENSEARCH_HOSTS", fmt.Sprintf("https://test-cluster-os-client.%s:9200", dashboards.Namespace),
 				),
-				HavePorts("http"),
+				HavePorts("https"),
 			)),
 		))
 	})

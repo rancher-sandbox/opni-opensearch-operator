@@ -8,6 +8,7 @@ import (
 	"github.com/banzaicloud/operator-tools/pkg/reconciler"
 	"github.com/rancher/opni-opensearch-operator/api/v1beta1"
 	"github.com/rancher/opni-opensearch-operator/pkg/resources"
+	"github.com/rancher/opni-opensearch-operator/pkg/resources/dashboards/certs"
 	"github.com/rancher/opni/pkg/util"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -76,6 +77,15 @@ func (r *Reconciler) Reconcile() (retResult *reconcile.Result, retErr error) {
 		}
 	}()
 
+	if r.dashboards.Spec.OpensearchCluster == nil && r.dashboards.Spec.TLSSecret == nil {
+		retErr = errors.New("tlsSecret or opensearchCluster required to set TLS for dashboards")
+		return
+	}
+
+	allResources := []resources.Resource{}
+	certsReconciler := certs.NewReconciler(r.ctx, r.client, r.dashboards)
+	certResource := certsReconciler.CertSecret()
+
 	dashboardsResources, err := r.DashboardsResources()
 	if err != nil {
 		retErr = errors.Combine(retErr, err)
@@ -84,7 +94,10 @@ func (r *Reconciler) Reconcile() (retResult *reconcile.Result, retErr error) {
 		return
 	}
 
-	for _, factory := range dashboardsResources {
+	allResources = append(allResources, certResource)
+	allResources = append(allResources, dashboardsResources...)
+
+	for _, factory := range allResources {
 		o, state, err := factory()
 		if err != nil {
 			retErr = errors.WrapIf(err, "failed to create object")
@@ -108,7 +121,7 @@ func (r *Reconciler) Reconcile() (retResult *reconcile.Result, retErr error) {
 }
 
 func (r *Reconciler) DashboardsResources() (resourceList []resources.Resource, _ error) {
-
+	resourceList = append(resourceList, r.dashboardsConfigSecret())
 	resourceList = append(resourceList, r.dashboardsServices()...)
 	resourceList = append(resourceList, r.dashboardshWorkloads()...)
 	return

@@ -406,11 +406,27 @@ spec:
                 properties:
                   name:
                     type: string
-                  namepace:
-                    type: string
                 type: object
-              opensearchUrl:
-                type: string
+              opensearchConfig:
+                properties:
+                  passwordFrom:
+                    properties:
+                      key:
+                        type: string
+                      name:
+                        type: string
+                      optional:
+                        type: boolean
+                    required:
+                    - key
+                    type: object
+                  url:
+                    type: string
+                  username:
+                    type: string
+                  verifySSL:
+                    type: boolean
+                type: object
               persistence:
                 properties:
                   accessModes:
@@ -449,6 +465,11 @@ spec:
                       pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                       x-kubernetes-int-or-string: true
                     type: object
+                type: object
+              tlsSecret:
+                properties:
+                  name:
+                    type: string
                 type: object
               tolerations:
                 items:

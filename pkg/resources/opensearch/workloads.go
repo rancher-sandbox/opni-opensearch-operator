@@ -30,17 +30,16 @@ func (r *Reconciler) opensearchWorkloads() []resources.Resource {
 func (r *Reconciler) opensearchDataWorkload() resources.Resource {
 	labels := resources.NewOpensearchLabels().
 		WithRole(v1beta1.OpensearchDataRole)
-
 	workload := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, OpensearchDataSuffix),
+			Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, resources.OpensearchDataSuffix),
 			Namespace: r.opensearchCluster.Namespace,
-			Labels:    labels,
+			Labels:    resources.CombineLabels(labels, resources.GenericLabels(r.opensearchCluster.Name)),
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas: r.opensearchCluster.Spec.Data.Replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
+				MatchLabels: resources.CombineLabels(labels, resources.GenericLabels(r.opensearchCluster.Name)),
 			},
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.OnDeleteStatefulSetStrategyType,
@@ -67,11 +66,12 @@ func (r *Reconciler) opensearchPodTemplate(
 	imageSpec := r.opensearchImageSpec()
 	podTemplate := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: labels,
+			Labels: resources.CombineLabels(labels, resources.GenericLabels(r.opensearchCluster.Name)),
 		},
 		Spec: corev1.PodSpec{
 			InitContainers: []corev1.Container{
 				initSysctlContainer(),
+				r.initCertCheckContainer(),
 			},
 			Containers: []corev1.Container{
 				{
@@ -165,14 +165,14 @@ func (r *Reconciler) opensearchMasterWorkload() resources.Resource {
 
 	workload := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, OpensearchMasterSuffix),
+			Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, resources.OpensearchMasterSuffix),
 			Namespace: r.opensearchCluster.Namespace,
-			Labels:    labels,
+			Labels:    resources.CombineLabels(labels, resources.GenericLabels(r.opensearchCluster.Name)),
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas: r.opensearchCluster.Spec.Master.Replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
+				MatchLabels: resources.CombineLabels(labels, resources.GenericLabels(r.opensearchCluster.Name)),
 			},
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
@@ -282,14 +282,14 @@ func (r *Reconciler) opensearchClientWorkload() resources.Resource {
 
 	workload := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, OpensearchClientSuffix),
+			Name:      fmt.Sprintf("%s-%s", r.opensearchCluster.Name, resources.OpensearchClientSuffix),
 			Namespace: r.opensearchCluster.Namespace,
-			Labels:    labels,
+			Labels:    resources.CombineLabels(labels, resources.GenericLabels(r.opensearchCluster.Name)),
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: r.opensearchCluster.Spec.Client.Replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
+				MatchLabels: resources.CombineLabels(labels, resources.GenericLabels(r.opensearchCluster.Name)),
 			},
 			Template: r.opensearchPodTemplate(labels),
 		},
@@ -317,6 +317,28 @@ func initSysctlContainer() corev1.Container {
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: pointer.Bool(true),
+		},
+	}
+}
+
+func (r *Reconciler) initCertCheckContainer() corev1.Container {
+	imageSpec := v1beta1.ImageResolver{
+		Version:             "15.3",
+		ImageName:           "sle15",
+		DefaultRepo:         "registry.suse.com/suse",
+		DefaultRepoOverride: r.opensearchCluster.Spec.DefaultRepo,
+		ImageOverride:       nil,
+	}.Resolve()
+	return corev1.Container{
+		Name:  "init-cert-check",
+		Image: imageSpec.GetImage(),
+		Command: []string{
+			"bash",
+			"-c",
+			`while [ ! -f "/usr/share/opensearch/config/certs/${HOSTNAME}.crt" ]; do echo 'Waiting for certs'; sleep 5; done`,
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			certsVolumeMount(),
 		},
 	}
 }

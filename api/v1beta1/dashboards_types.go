@@ -23,8 +23,8 @@ import (
 
 // DashboardsSpec defines the desired state of OpensearchDashboard
 type DashboardsSpec struct {
-	OpensearchCluster *OpensearchClusterRef        `json:"opensearch,omitempty"`
-	OpensearchURL     string                       `json:"opensearchUrl,omitempty"`
+	OpensearchCluster *corev1.LocalObjectReference `json:"opensearch,omitempty"`
+	OpensearchConfig  *OpensearchConfigSpec        `json:"opensearchConfig,omitempty"`
 	Version           string                       `json:"version"`
 	DefaultRepo       *string                      `json:"defaultRepo,omitempty"`
 	Image             *ImageSpec                   `json:"image,omitempty"`
@@ -34,11 +34,14 @@ type DashboardsSpec struct {
 	NodeSelector      map[string]string            `json:"nodeSelector,omitempty"`
 	Tolerations       []corev1.Toleration          `json:"tolerations,omitempty"`
 	Persistence       *PersistenceSpec             `json:"persistence,omitempty"`
+	TLSSecret         *corev1.LocalObjectReference `json:"tlsSecret,omitempty"`
 }
 
-type OpensearchClusterRef struct {
-	Name      string `json:"name,omitempty"`
-	Namespace string `json:"namepace,omitempty"`
+type OpensearchConfigSpec struct {
+	URL          string                    `json:"url,omitempty"`
+	Username     string                    `json:"username,omitempty"`
+	PasswordFrom *corev1.SecretKeySelector `json:"passwordFrom,omitempty"`
+	VerifySSL    *bool                     `json:"verifySSL,omitempty"`
 }
 
 // DashboardsStatus defines the observed state of OpensearchDashboard

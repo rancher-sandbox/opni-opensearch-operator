@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/rancher/opni-opensearch-operator/api/v1beta1"
+	"github.com/rancher/opni-opensearch-operator/pkg/resources"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -70,7 +71,7 @@ func (r *Reconciler) opensearchNodeTypeEnv(role v1beta1.OpensearchRole) []corev1
 	if role == v1beta1.OpensearchMasterRole && (r.masterSingleton() || !r.opensearchCluster.Status.Initialized) {
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "cluster.initial_master_nodes",
-			Value: fmt.Sprintf("%s-%s-0", r.opensearchCluster.Name, OpensearchMasterSuffix),
+			Value: fmt.Sprintf("%s-%s-0", r.opensearchCluster.Name, resources.OpensearchMasterSuffix),
 		})
 	}
 	envVars = append(envVars, role.GetExtraEnvVars(r.opensearchCluster)...)
