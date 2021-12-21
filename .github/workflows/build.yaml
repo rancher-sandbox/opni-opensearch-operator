@@ -44,6 +44,7 @@ jobs:
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
+    - run: go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.5.0
     - run: scripts/build
     - run: scripts/validate
     - run: cp -r /bin/manager ./package/
