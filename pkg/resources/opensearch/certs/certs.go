@@ -121,7 +121,7 @@ func (c *Reconciler) createSANExtension(podName string, serviceName string, podI
 	}, nil
 }
 
-func (c *CertsReconciler) createTransportCert(san pkix.Extension) (cert []byte, key []byte, err error) {
+func (c *Reconciler) createTransportCert(san pkix.Extension) (cert []byte, key []byte, err error) {
 
 	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 	if err != nil {
@@ -371,5 +371,5 @@ func (c *Reconciler) CertSecrets() (resourceList []resources.Resource, err error
 }
 
 func IsEmptyPodList(err error) bool {
-	return err == ErrEmptyPodList
+	return errors.Is(err, ErrEmptyPodList)
 }

@@ -10,6 +10,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -140,7 +141,7 @@ func SignCertificate(ca *tls.Certificate, cert *x509.Certificate, pubKey *rsa.Pu
 }
 
 func IsSecretDataMissing(err error) bool {
-	return err == ErrSecretDataMissing
+	return errors.Is(err, ErrSecretDataMissing)
 }
 
 func RetrieveCert(

@@ -26,22 +26,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type CertsReconciler struct {
+type Reconciler struct {
 	dashboards *v1beta1.Dashboards
 	client     client.Client
 	ctx        context.Context
 	restCA     *tls.Certificate
 }
 
-func NewCertsReconciler(ctx context.Context, client client.Client, dashboards *v1beta1.Dashboards) *CertsReconciler {
-	return &CertsReconciler{
+func NewReconciler(ctx context.Context, client client.Client, dashboards *v1beta1.Dashboards) *Reconciler {
+	return &Reconciler{
 		client:     client,
 		ctx:        ctx,
 		dashboards: dashboards,
 	}
 }
 
-func (c *CertsReconciler) setRESTCA(caPEM []byte, caKeyPEM []byte) (err error) {
+func (c *Reconciler) setRESTCA(caPEM []byte, caKeyPEM []byte) (err error) {
 	ca, err := tls.X509KeyPair(caPEM, caKeyPEM)
 	if err != nil {
 		return err
@@ -50,7 +50,7 @@ func (c *CertsReconciler) setRESTCA(caPEM []byte, caKeyPEM []byte) (err error) {
 	return
 }
 
-func (c *CertsReconciler) fetchAndSetRESTCA() (err error) {
+func (c *Reconciler) fetchAndSetRESTCA() (err error) {
 	ca, key, err := pki.RetrieveCert(pki.RESTCASecretField, pki.RESTCAKeySecretField, c.dashboards.Spec.OpensearchCluster.Name, c.dashboards.Namespace, c.client)
 	if err != nil {
 		return
@@ -60,7 +60,7 @@ func (c *CertsReconciler) fetchAndSetRESTCA() (err error) {
 	return
 }
 
-func (c *CertsReconciler) createRESTCert() (cert []byte, key []byte, err error) {
+func (c *Reconciler) createRESTCert() (cert []byte, key []byte, err error) {
 	rawValues := []asn1.RawValue{}
 	dnsNames := []string{
 		fmt.Sprintf("%s-%s.%s", c.dashboards.Name, resources.OpensearchDashboardsSuffix, c.dashboards.Namespace),
@@ -127,7 +127,7 @@ func (c *CertsReconciler) createRESTCert() (cert []byte, key []byte, err error) 
 	return
 }
 
-func (c *CertsReconciler) maybeUpdateRESTCert() (cert []byte, key []byte, err error) {
+func (c *Reconciler) maybeUpdateRESTCert() (cert []byte, key []byte, err error) {
 	tlsSecret := &corev1.Secret{}
 	err = c.client.Get(c.ctx, types.NamespacedName{
 		Name:      fmt.Sprintf("%s-osdb-tls", c.dashboards.Name),
@@ -149,7 +149,7 @@ func (c *CertsReconciler) maybeUpdateRESTCert() (cert []byte, key []byte, err er
 	return
 }
 
-func (c *CertsReconciler) CertSecret() resources.Resource {
+func (c *Reconciler) CertSecret() resources.Resource {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-osdb-tls", c.dashboards.Name),

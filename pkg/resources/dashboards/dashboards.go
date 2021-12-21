@@ -83,7 +83,7 @@ func (r *Reconciler) Reconcile() (retResult *reconcile.Result, retErr error) {
 	}
 
 	allResources := []resources.Resource{}
-	certsReconciler := certs.NewCertsReconciler(r.ctx, r.client, r.dashboards)
+	certsReconciler := certs.NewReconciler(r.ctx, r.client, r.dashboards)
 	certResource := certsReconciler.CertSecret()
 
 	dashboardsResources, err := r.DashboardsResources()

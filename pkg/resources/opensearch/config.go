@@ -244,7 +244,7 @@ func (r *Reconciler) retriveOrGenerateAdminPassword() (password []byte, err erro
 		}
 		password, ok = secret.Data[r.opensearchCluster.Spec.AdminPasswordFrom.Key]
 		if !ok {
-			err = fmt.Errorf("%s key does not exist in %s", r.opensearchCluster.Spec.AdminPasswordFrom.Key, r.opensearchCluster.Spec.AdminPasswordFrom.Name)
+			err = ErrSecretKeyNotExist(r.opensearchCluster.Spec.AdminPasswordFrom.Key, r.opensearchCluster.Spec.AdminPasswordFrom.Name)
 		}
 		return
 	}
@@ -260,8 +260,7 @@ func (r *Reconciler) retriveOrGenerateAdminPassword() (password []byte, err erro
 		}
 		password, ok = existingSecret.Data[r.opensearchCluster.Status.Auth.OpensearchAuthSecretKeyRef.Key]
 		if !ok {
-			err = fmt.Errorf(
-				"%s key does not exist in %s",
+			err = ErrSecretKeyNotExist(
 				r.opensearchCluster.Status.Auth.OpensearchAuthSecretKeyRef.Key,
 				r.opensearchCluster.Status.Auth.OpensearchAuthSecretKeyRef.Name,
 			)
@@ -286,11 +285,7 @@ func (r *Reconciler) retriveOrGenerateDashboardsPassword() (password []byte, err
 		}
 		password, ok = existingSecret.Data["dashboards"]
 		if !ok {
-			err = fmt.Errorf(
-				"%s key does not exist in %s",
-				"dashboards",
-				fmt.Sprintf("%s-%s", r.opensearchCluster.Name, PasswordSecretSuffix),
-			)
+			err = ErrSecretKeyNotExist("dashboards", fmt.Sprintf("%s-%s", r.opensearchCluster.Name, PasswordSecretSuffix))
 		}
 		return
 	}
