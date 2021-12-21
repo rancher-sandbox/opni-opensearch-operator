@@ -55,7 +55,7 @@ kibanaserver:
   description: "Opensearch Dashboards user"
 `))
 
-	// TODO: investigate alternatives for storing this config.  Tidy up and test the cert hostname generati
+	// TODO: investigate alternatives for storing this config.
 	defaultConfig = `network.host: 0.0.0.0
 plugins.security.ssl.transport.pemcert_filepath: certs/${HOSTNAME}.crt
 plugins.security.ssl.transport.pemkey_filepath: certs/${HOSTNAME}.key

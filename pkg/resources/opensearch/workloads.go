@@ -335,7 +335,7 @@ func (r *Reconciler) initCertCheckContainer() corev1.Container {
 		Command: []string{
 			"bash",
 			"-c",
-			"while [ ! -f /usr/share/opensearch/config/certs/${HOSTNAME}.crt ]; do echo 'Waiting for certs'; sleep 5; done",
+			`while [ ! -f "/usr/share/opensearch/config/certs/${HOSTNAME}.crt" ]; do echo 'Waiting for certs'; sleep 5; done`,
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			certsVolumeMount(),
