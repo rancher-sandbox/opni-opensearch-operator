@@ -4,7 +4,7 @@ The Opni Opensearch Operator is a Kubernetes operator designed to deploy and man
 
 ## Features
 
-The Opensearch operator cuurently provides the following features:
+The Opensearch operator currently provides the following features:
 
 - Deploy an Opensearch cluster with separate master, data, and client nodes.
 - Manage certificates for the cluster, and rotate certificates when they are about to expire.
