@@ -89,6 +89,17 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 			HaveOwner(dashboards),
 		))
 	})
+	It("should create the secret when tls secret isn't specified", func() {
+		Eventually(Object(&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-dashboards-osdb-tls",
+				Namespace: dashboards.Namespace,
+			},
+		})).Should(ExistAnd(
+			HaveData("tls.crt", nil),
+			HaveData("tls.key", nil),
+		))
+	})
 	It("should update the replica counts", func() {
 		updateObject(dashboards, func(obj *v1beta1.Dashboards) {
 			obj.Spec.Replicas = pointer.Int32(2)
@@ -99,6 +110,32 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 				Namespace: dashboards.Namespace,
 			},
 		})).Should(HaveReplicaCount(2))
+	})
+	It("should not create a secret when tls is specified", func() {
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-tls",
+				Namespace: dashboards.Namespace,
+			},
+			Type: corev1.SecretTypeTLS,
+			StringData: map[string]string{
+				"tls.crt": "this is cert data",
+				"tls.key": "this is key data",
+			},
+		}
+		Expect(k8sClient.Create(context.Background(), secret)).To(Succeed())
+
+		updateObject(dashboards, func(obj *v1beta1.Dashboards) {
+			obj.Spec.TLSSecret = &corev1.LocalObjectReference{
+				Name: secret.Name,
+			}
+		})
+		Eventually(Object(&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-dashboards-osdb-tls",
+				Namespace: dashboards.Namespace,
+			},
+		})).ShouldNot(Exist())
 	})
 	It("should remove the resources when deleted", func() {
 		Expect(k8sClient.Delete(context.Background(), dashboards)).To(Succeed())

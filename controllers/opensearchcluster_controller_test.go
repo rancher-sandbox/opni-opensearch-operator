@@ -102,6 +102,10 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 					HaveName("internalusers"),
 					HaveVolumeSource("Secret"),
 				)),
+				HaveMatchingVolume(And(
+					HaveName("certs"),
+					HaveVolumeSource("Secret"),
+				)),
 				HaveMatchingContainer(And(
 					HaveName("opensearch"),
 					HaveImage("docker.io/opensearchproject/opensearch:1.0.0"),
@@ -112,6 +116,7 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 					HavePorts("transport", "http", "metrics", "rca"),
 					HaveVolumeMounts("config", "opensearch-data"),
 					HaveVolumeMounts("internalusers", "test-cluster-os-internalusers"),
+					HaveVolumeMounts("certs", "test-cluster-os-certs"),
 				)),
 				HaveMatchingPersistentVolume(And(
 					HaveName("opensearch-data"),
@@ -147,6 +152,7 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 					HavePorts("transport"),
 					HaveVolumeMounts("config", "opensearch-data"),
 					HaveVolumeMounts("internalusers", "test-cluster-os-internalusers"),
+					HaveVolumeMounts("certs", "test-cluster-os-certs"),
 				)),
 				HaveMatchingPersistentVolume(And(
 					HaveName("opensearch-data"),
@@ -154,6 +160,10 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 				)),
 				HaveMatchingVolume(And(
 					HaveName("internalusers"),
+					HaveVolumeSource("Secret"),
+				)),
+				HaveMatchingVolume(And(
+					HaveName("certs"),
 					HaveVolumeSource("Secret"),
 				)),
 			))
@@ -181,10 +191,15 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 					HavePorts("transport", "http", "metrics", "rca"),
 					HaveVolumeMounts("config"),
 					HaveVolumeMounts("internalusers", "test-cluster-os-internalusers"),
+					HaveVolumeMounts("certs", "test-cluster-os-certs"),
 					Not(HaveVolumeMounts("opensearch-data")),
 				)),
 				HaveMatchingVolume(And(
 					HaveName("internalusers"),
+					HaveVolumeSource("Secret"),
+				)),
+				HaveMatchingVolume(And(
+					HaveName("certs"),
 					HaveVolumeSource("Secret"),
 				)),
 			))
@@ -213,6 +228,7 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 		})).Should(ExistAnd(
 			HaveOwner(osCluster),
 			HaveData("logging.yml", nil),
+			HaveData("opensearch.yml", nil),
 		))
 		Eventually(Object(&corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -232,6 +248,17 @@ var _ = Describe("OpensearchCluster Controller", Label("controller"), func() {
 		})).Should(ExistAnd(
 			HaveOwner(osCluster),
 			HaveData("internal_users.yml", nil),
+		))
+		Eventually(Object(&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster-os-pki",
+				Namespace: osCluster.Namespace,
+			},
+		})).Should(ExistAnd(
+			HaveData("transportca.crt", nil),
+			HaveData("transportca.key", nil),
+			HaveData("httpca.crt", nil),
+			HaveData("httpca.key", nil),
 		))
 	})
 	It("should update the replica counts", func() {
